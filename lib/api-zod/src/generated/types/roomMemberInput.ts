@@ -9,4 +9,6 @@
 export interface RoomMemberInput {
   /** @maxLength 24 */
   name?: string;
+  /** @pattern ^[a-f0-9]{64}$ */
+  admissionToken?: string;
 }
