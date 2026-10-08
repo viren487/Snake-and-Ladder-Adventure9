@@ -7,3 +7,4 @@
 - [Multiplayer capacity audits](multiplayer-capacity-audits.md) — Typechecks can miss fixed-two-seat logic; verify web admission and multi-panda rendering.
 - [Stable multiplayer controls](online-room-ui.md) — Keep room actions compact; Fire stays in the dice slot while aiming, with selected heads marked red.
 - [Opaque-origin mobile preview](mobile-webview-storage.md) — For `srcDoc` saves, allow `null` origins only from the exact iframe and validate message keys.
+- [SVG gradient offsets on mobile](svg-gradient-offsets.md) — Use numeric fractions for React Native SVG stops; decimal-string offsets like ".3" warn on Android.
