@@ -81,8 +81,8 @@ Do not rely on a timed smooth scroll to make short gameplay effects visible. Pos
 
 ## Snake and ladder movement
 
-Snake slides and ladder climbs should be visibly slower and playful, with gentle panda wobble or bounce rather than near-instant jumps.
+Panda movement on mobile should reproduce the website's step hops, ladder climb, snake slide and bamboo return path rather than using a plain glide.
 
-**Why:** The user said the snake-bite and ladder-climb effects were too fast and requested a slower, cute animation.
+**Why:** On October 9, 2026, the user specifically asked for mobile panda movement to be the website version after noticing the two clients moved differently. They had earlier asked that snake and ladder movement be slower and playful.
 
-**How to apply:** Keep visual motion and turn-completion timing synchronized in both clients, while respecting reduced-motion settings.
+**How to apply:** Treat the website's timing, easing, body motion and return route as the source of truth. Keep native reduced-motion behavior and turn completion synchronized with the visible animation.

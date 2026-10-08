@@ -440,7 +440,13 @@ export default function IndexScreen() {
           });
           await wait(reduceMotion ? 45 : 2680);
           if (!stillCurrent()) return;
-          setMotion({ playerId: moved.id, position: 0, effect: 'step' });
+          setMotion({
+            playerId: moved.id,
+            position: 0,
+            effect: 'step',
+            carriedItem: moved.crownKeyRoom !== null ? 'key' : 'torch',
+            sourcePosition: 100,
+          });
           await wait(reduceMotion ? 45 : 300);
         } else if (moved && (event.effect === 'ladder' || event.effect === 'snake')) {
           sounds.play(event.effect);
@@ -734,9 +740,15 @@ export default function IndexScreen() {
             setPickupNotice({ id: ++pickupSequence.current, kind: 'torch', playerName: moved.name });
           }
           setMotion({ playerId: moved.id, position: 0, effect: 'bamboo', sourcePosition: 100, carriedItem });
-          await wait(reduceMotion ? 45 : 2600);
+          await wait(reduceMotion ? 45 : 2680);
           if (!stillCurrent()) return;
-          setMotion({ playerId: moved.id, position: 0, effect: 'step' });
+          setMotion({
+            playerId: moved.id,
+            position: 0,
+            effect: 'step',
+            carriedItem,
+            sourcePosition: 100,
+          });
           await wait(reduceMotion ? 45 : 300);
         }
       } else if (resolution.effect === 'snake' || resolution.effect === 'ladder') {
