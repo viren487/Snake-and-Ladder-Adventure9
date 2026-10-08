@@ -384,57 +384,236 @@ function CarriedItem({ kind }: { kind: 'torch' | 'key' }) {
   );
 }
 
-function PandaToken({ color, carriedItem }: { color: string; carriedItem?: 'torch' | 'key' | null }) {
+function PandaToken({
+  color,
+  carriedItem,
+  specialMove = null,
+  motionEffect = 'step',
+  animationId = 0,
+}: {
+  color: string;
+  carriedItem?: 'torch' | 'key' | null;
+  specialMove?: 'ladder' | 'snake' | 'boom' | 'bamboo' | null;
+  motionEffect?: BoardMotion['effect'];
+  animationId?: number;
+}) {
   const colors = useColors();
   const scarf = tokenColor(color, colors);
   const scarfShade = color === 'blue' ? '#0879ad' : color === 'coral' ? '#c44839' : color === 'green' ? '#168353' : '#714cba';
   return (
     <View style={styles.tokenWrap}>
-      <Svg width={27} height={33} viewBox="0 0 52 62" aria-hidden={true}>
-        <Ellipse cx={26} cy={57} rx={14} ry={3} fill="#10151b" opacity={0.4} />
-        <Ellipse cx={26} cy={47} rx={15} ry={11} fill={scarf} stroke="#473523" strokeWidth={1.5} />
-        <Path d="M13 44q13 8 26 0v6q-13 9-26 0Z" fill={scarfShade} />
-        <Path d="m35 48 8 5-7 3-4-7Z" fill={scarf} stroke="#473523" strokeWidth={1} strokeLinejoin="round" />
-        <Circle cx={12} cy={17} r={8} fill="#24252a" />
-        <Circle cx={40} cy={17} r={8} fill="#24252a" />
-        <Circle cx={12} cy={17} r={3.2} fill="#efb7ad" />
-        <Circle cx={40} cy={17} r={3.2} fill="#efb7ad" />
-        <Path d="M8 28c0-12 7-20 18-20s18 8 18 20c0 11-7 18-18 18S8 39 8 28Z" fill="#fff7e8" stroke="#55412f" strokeWidth={1.5} />
-        <Ellipse cx={17} cy={26} rx={5.6} ry={7.3} fill="#28282b" transform="rotate(18 17 26)" />
-        <Ellipse cx={35} cy={26} rx={5.6} ry={7.3} fill="#28282b" transform="rotate(-18 35 26)" />
-        <Circle cx={18.4} cy={25.8} r={2.3} fill="#fffdf5" />
-        <Circle cx={33.6} cy={25.8} r={2.3} fill="#fffdf5" />
-        <Circle cx={18.8} cy={26} r={1.3} fill="#18191c" />
-        <Circle cx={33.2} cy={26} r={1.3} fill="#18191c" />
-        <Ellipse cx={26} cy={34} rx={8.2} ry={5.7} fill="#fffdf5" stroke="#dfd5c5" strokeWidth={0.7} />
-        <Path d="M23 32q3-2 6 0-1.5 3.2-3 3.2T23 32Z" fill="#352724" />
-        <Path d="M26 35v2.2q-2.2 2.3-4.2.2m4.2-.2q2.2 2.3 4.2.2" fill="none" stroke="#43312a" strokeWidth={1.2} strokeLinecap="round" />
-        <Circle cx={12} cy={35} r={2} fill="#ee9989" opacity={0.65} />
-        <Circle cx={40} cy={35} r={2} fill="#ee9989" opacity={0.65} />
-        <Path d="M20 44q6 2 12 0" fill="none" stroke="#fff9e9" strokeWidth={1.4} opacity={0.8} />
-      </Svg>
+      <PandaMotion effect={motionEffect} animationId={animationId}>
+        <Svg width={27} height={33} viewBox="0 0 52 62" aria-hidden={true}>
+          <Ellipse cx={26} cy={57} rx={14} ry={3} fill="#10151b" opacity={0.4} />
+          <Ellipse cx={26} cy={47} rx={15} ry={11} fill={scarf} stroke="#473523" strokeWidth={1.5} />
+          <Path d="M13 44q13 8 26 0v6q-13 9-26 0Z" fill={scarfShade} />
+          <Path d="m35 48 8 5-7 3-4-7Z" fill={scarf} stroke="#473523" strokeWidth={1} strokeLinejoin="round" />
+          <Circle cx={12} cy={17} r={8} fill="#24252a" />
+          <Circle cx={40} cy={17} r={8} fill="#24252a" />
+          <Circle cx={12} cy={17} r={3.2} fill="#efb7ad" />
+          <Circle cx={40} cy={17} r={3.2} fill="#efb7ad" />
+          <Path d="M8 28c0-12 7-20 18-20s18 8 18 20c0 11-7 18-18 18S8 39 8 28Z" fill="#fff7e8" stroke="#55412f" strokeWidth={1.5} />
+          <Ellipse cx={17} cy={26} rx={5.6} ry={7.3} fill="#28282b" transform="rotate(18 17 26)" />
+          <Ellipse cx={35} cy={26} rx={5.6} ry={7.3} fill="#28282b" transform="rotate(-18 35 26)" />
+          <Circle cx={18.4} cy={25.8} r={2.3} fill="#fffdf5" />
+          <Circle cx={33.6} cy={25.8} r={2.3} fill="#fffdf5" />
+          <Circle cx={18.8} cy={26} r={1.3} fill="#18191c" />
+          <Circle cx={33.2} cy={26} r={1.3} fill="#18191c" />
+          <Ellipse cx={26} cy={34} rx={8.2} ry={5.7} fill="#fffdf5" stroke="#dfd5c5" strokeWidth={0.7} />
+          <Path d="M23 32q3-2 6 0-1.5 3.2-3 3.2T23 32Z" fill="#352724" />
+          <Path d="M26 35v2.2q-2.2 2.3-4.2.2m4.2-.2q2.2 2.3 4.2.2" fill="none" stroke="#43312a" strokeWidth={1.2} strokeLinecap="round" />
+          <Circle cx={12} cy={35} r={2} fill="#ee9989" opacity={0.65} />
+          <Circle cx={40} cy={35} r={2} fill="#ee9989" opacity={0.65} />
+          <Path d="M20 44q6 2 12 0" fill="none" stroke="#fff9e9" strokeWidth={1.4} opacity={0.8} />
+        </Svg>
+        {(specialMove === 'ladder' || specialMove === 'snake') && (
+          <>
+            <PandaSparkle index={0} color={specialMove === 'ladder' ? '#ffe998' : '#dfccff'} />
+            <PandaSparkle index={1} color={specialMove === 'ladder' ? '#ffe998' : '#dfccff'} />
+            <PandaSparkle index={2} color={specialMove === 'ladder' ? '#ffe998' : '#dfccff'} />
+          </>
+        )}
+      </PandaMotion>
       {carriedItem && <CarriedItem key={carriedItem} kind={carriedItem} />}
     </View>
+  );
+}
+
+function PandaSparkle({ index, color }: { index: number; color: string }) {
+  const reduceMotion = useReducedMotionSetting();
+  const progress = useSharedValue(0);
+  React.useEffect(() => {
+    if (reduceMotion) {
+      progress.value = 0.5;
+      return;
+    }
+    progress.value = withDelay(index * 220, withRepeat(
+      withSequence(
+        withTiming(1, { duration: 400, easing: Easing.inOut(Easing.cubic) }),
+        withTiming(0, { duration: 400, easing: Easing.inOut(Easing.cubic) }),
+      ),
+      -1,
+    ));
+  }, [index, progress, reduceMotion]);
+  const sparkleStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.5, 1], [0.25, 1, 0.25]),
+    transform: [
+      { scale: interpolate(progress.value, [0, 0.5, 1], [0.55, 1.15, 0.55]) },
+      { rotate: `${interpolate(progress.value, [0, 1], [-12, 12])}deg` },
+    ],
+  }));
+  const positionStyle = index === 0 ? styles.pandaSparkleLeft : index === 1 ? styles.pandaSparkleRight : styles.pandaSparkleFoot;
+  return (
+    <Animated.View pointerEvents="none" style={[styles.pandaSparkle, positionStyle, sparkleStyle]}>
+      <MaterialCommunityIcons name="creation" size={11} color={color} />
+    </Animated.View>
+  );
+}
+
+function PandaMotion({
+  effect,
+  animationId,
+  children,
+}: {
+  effect: BoardMotion['effect'];
+  animationId: number;
+  children: React.ReactNode;
+}) {
+  const reduceMotion = useReducedMotionSetting();
+  const progress = useSharedValue(1);
+  React.useEffect(() => {
+    if (!animationId || reduceMotion) {
+      progress.value = effect === 'bamboo' ? 0.5 : 1;
+      return;
+    }
+    progress.value = 0;
+    if (effect === 'bamboo') {
+      progress.value = withRepeat(withTiming(1, { duration: 240, easing: Easing.linear }), -1, true);
+    } else if (effect === 'ladder') {
+      const ease = Easing.inOut(Easing.cubic);
+      progress.value = withSequence(
+        withTiming(0.12, { duration: 264, easing: ease }),
+        withTiming(0.24, { duration: 264, easing: ease }),
+        withTiming(0.36, { duration: 264, easing: ease }),
+        withTiming(0.48, { duration: 264, easing: ease }),
+        withTiming(0.60, { duration: 264, easing: ease }),
+        withTiming(0.72, { duration: 264, easing: ease }),
+        withTiming(0.86, { duration: 308, easing: ease }),
+        withTiming(0.95, { duration: 198, easing: ease }),
+        withTiming(1, { duration: 110, easing: ease }),
+      );
+    } else if (effect === 'snake') {
+      const ease = Easing.inOut(Easing.cubic);
+      progress.value = withSequence(
+        withTiming(0.18, { duration: 360, easing: ease }),
+        withTiming(0.38, { duration: 400, easing: ease }),
+        withTiming(0.58, { duration: 400, easing: ease }),
+        withTiming(0.78, { duration: 400, easing: ease }),
+        withTiming(0.91, { duration: 260, easing: ease }),
+        withTiming(1, { duration: 180, easing: ease }),
+      );
+    } else if (effect === 'boom') {
+      const ease = Easing.bezier(0.18, 0.68, 0.18, 1);
+      progress.value = withSequence(
+        withTiming(0.17, { duration: 399, easing: ease }),
+        withTiming(0.38, { duration: 494, easing: ease }),
+        withTiming(0.63, { duration: 588, easing: ease }),
+        withTiming(0.84, { duration: 493, easing: ease }),
+        withTiming(1, { duration: 376, easing: ease }),
+      );
+    } else {
+      const ease = Easing.bezier(0.2, 0.8, 0.25, 1);
+      progress.value = withSequence(
+        withTiming(0.38, { duration: 84, easing: ease }),
+        withTiming(0.70, { duration: 70, easing: ease }),
+        withTiming(1, { duration: 66, easing: ease }),
+      );
+    }
+  }, [animationId, effect, progress, reduceMotion]);
+
+  const motionStyle = useAnimatedStyle(() => {
+    let translateX = 0;
+    let translateY = 0;
+    let rotate = 0;
+    let scaleX = 1;
+    let scaleY = 1;
+    if (effect === 'ladder') {
+      const frames = [0, 0.12, 0.24, 0.36, 0.48, 0.60, 0.72, 0.86, 0.95, 1];
+      translateY = interpolate(progress.value, frames, [0, -4.03, 0.31, -4.03, 0.31, -4.03, 0.31, -2.48, 0.62, 0]);
+      rotate = interpolate(progress.value, frames, [0, -5, 4, -5, 4, -5, 4, -2, 0, 0]);
+      scaleX = interpolate(progress.value, frames, [0.98, 1.03, 0.98, 1.03, 0.98, 1.03, 0.98, 1.04, 1.06, 1]);
+      scaleY = interpolate(progress.value, frames, [0.98, 0.98, 1.02, 0.98, 1.02, 0.98, 1.02, 1, 0.94, 1]);
+    } else if (effect === 'snake') {
+      const frames = [0, 0.18, 0.38, 0.58, 0.78, 0.91, 1];
+      translateX = interpolate(progress.value, frames, [0, -2.52, 2.52, -1.96, 1.68, 0, 0]);
+      translateY = interpolate(progress.value, frames, [0, 1.86, 3.1, 2.17, 1.24, 0.93, 0]);
+      rotate = interpolate(progress.value, frames, [0, -10, 11, -8, 7, -2, 0]);
+      scaleX = interpolate(progress.value, frames, [1, 0.98, 0.96, 0.98, 1, 1.07, 1]);
+      scaleY = interpolate(progress.value, frames, [1, 0.98, 0.96, 0.98, 1, 0.93, 1]);
+    } else if (effect === 'boom') {
+      const frames = [0, 0.17, 0.38, 0.63, 0.84, 1];
+      rotate = interpolate(progress.value, frames, [0, 180, 430, 690, 900, 1080]);
+      scaleX = scaleY = interpolate(progress.value, frames, [1, 0.9, 1.13, 1.02, 0.9, 0.72]);
+    } else if (effect === 'bamboo') {
+      rotate = interpolate(progress.value, [0, 1], [-5, 5]);
+    } else {
+      const frames = [0, 0.38, 0.70, 1];
+      translateY = interpolate(progress.value, frames, [0, -4.03, -1.86, 0]);
+      rotate = interpolate(progress.value, frames, [0, -3, 2, 0]);
+      scaleX = interpolate(progress.value, frames, [0.96, 1.04, 0.99, 1]);
+      scaleY = interpolate(progress.value, frames, [1.03, 0.96, 1.02, 1]);
+    }
+    return {
+      transform: [
+        { translateX },
+        { translateY },
+        { rotate: `${rotate}deg` },
+        { scaleX },
+        { scaleY },
+      ],
+    };
+  });
+  const captionStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.15, 0.8, 1], [0, 1, 1, 0]),
+    transform: [
+      { translateY: interpolate(progress.value, [0, 0.15, 0.8, 1], [4, 0, 0, -7]) },
+      { scale: interpolate(progress.value, [0, 0.15, 0.8, 1], [0.8, 1, 1, 0.95]) },
+    ],
+  }));
+  const caption = effect === 'ladder' ? 'Up we go!' : effect === 'snake' ? 'Wheee!' : null;
+  return (
+    <>
+      <Animated.View style={[styles.pandaMotion, motionStyle]}>{children}</Animated.View>
+      {!!caption && animationId > 0 && (
+        <Animated.View pointerEvents="none" style={[styles.moveCaption, captionStyle]}>
+          <Text style={[styles.moveCaptionText, { color: effect === 'ladder' ? '#5c3c21' : '#573b70' }]}>{caption}</Text>
+        </Animated.View>
+      )}
+    </>
   );
 }
 
 function AnimatedPawnSpot({
   position,
   boardSize,
-  shift,
+  shiftX,
+  shiftY,
   effect,
   animationId,
   children,
 }: {
   position: number;
   boardSize: number;
-  shift: number;
+  shiftX: number;
+  shiftY: number;
   effect: BoardMotion['effect'];
   animationId: number;
   children: React.ReactNode;
 }) {
   const reduceMotion = useReducedMotionSetting();
-  const point = centerForSquare(position);
+  const point = effect === 'bamboo'
+    ? { x: -36, y: position === 100 ? 50 : 948 }
+    : centerForSquare(position);
   const x = useSharedValue(0);
   const y = useSharedValue(0);
   const ready = React.useRef(false);
@@ -454,13 +633,21 @@ function AnimatedPawnSpot({
         : effect === 'boom' ? 2350
           : effect === 'web' ? 1450
             : effect === 'knife' ? 1250
-              : 220;
-    x.value = withTiming(targetX, { duration, easing: Easing.out(Easing.cubic) });
-    y.value = withTiming(targetY, { duration, easing: Easing.out(Easing.cubic) });
+              : effect === 'bamboo' ? 180
+                : 210;
+    const easing = effect === 'ladder' ? Easing.bezier(0.35, 0.05, 0.3, 1)
+      : effect === 'snake' ? Easing.bezier(0.4, 0.05, 0.55, 1)
+        : effect === 'boom' ? Easing.bezier(0.18, 0.68, 0.18, 1)
+          : effect === 'web' ? Easing.bezier(0.2, 0.76, 0.25, 1)
+            : effect === 'knife' ? Easing.bezier(0.35, 0.02, 0.6, 1)
+              : effect === 'bamboo' ? Easing.out(Easing.cubic)
+                : Easing.bezier(0.2, 0.8, 0.25, 1);
+    x.value = withTiming(targetX, { duration, easing });
+    y.value = withTiming(targetY, { duration, easing });
   }, [animationId, boardSize, effect, point.x, point.y, reduceMotion, x, y]);
 
   const motionStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: x.value + shift }, { translateY: y.value }],
+    transform: [{ translateX: x.value + shiftX }, { translateY: y.value + shiftY }],
   }));
   return (
     <Animated.View pointerEvents="none" style={[styles.pawnSpot, motionStyle]}>
@@ -636,6 +823,8 @@ function HomecomingPanda({
   delay,
   animationId,
   duration = 2350,
+  bamboo = false,
+  bambooLanding = false,
 }: {
   color: string;
   carriedItem?: 'torch' | 'key' | null;
@@ -644,37 +833,53 @@ function HomecomingPanda({
   delay: number;
   animationId: number;
   duration?: number;
+  bamboo?: boolean;
+  bambooLanding?: boolean;
 }) {
+  const reduceMotion = useReducedMotionSetting();
   const progress = useSharedValue(0);
-  const from = centerForSquare(fromSquare);
-  const home = { x: 70, y: 948 };
+  const from = bamboo
+    ? bambooLanding ? { x: -36, y: 948 } : { x: -36, y: 50 }
+    : centerForSquare(fromSquare);
+  const home = bamboo
+    ? bambooLanding ? { x: 70, y: 948 } : { x: -36, y: 948 }
+    : { x: 70, y: 948 };
 
   React.useEffect(() => {
     if (boardSize <= 0) return;
     progress.value = 0;
+    if (reduceMotion) {
+      progress.value = 1;
+      return;
+    }
+    const easing = bamboo
+      ? bambooLanding ? Easing.bezier(0.2, 0.8, 0.25, 1) : Easing.bezier(0.35, 0.05, 0.55, 1)
+      : Easing.bezier(0.18, 0.68, 0.18, 1);
     progress.value = withDelay(delay, withTiming(1, {
-      duration,
-      easing: Easing.out(Easing.cubic),
+      duration: bambooLanding ? 210 : duration,
+      easing,
     }));
-  }, [animationId, boardSize, delay, duration, progress]);
+  }, [animationId, bamboo, bambooLanding, boardSize, delay, duration, progress, reduceMotion]);
 
   const motionStyle = useAnimatedStyle(() => {
     const amount = progress.value;
-    const sway = Math.sin(amount * Math.PI * 3) * boardSize * 0.018;
     return {
-      opacity: interpolate(amount, [0, 0.8, 1], [1, 1, 0]),
       transform: [
-        { translateX: ((from.x + (home.x - from.x) * amount) / 1000) * boardSize - 12 + sway },
-        { translateY: ((from.y + (home.y - from.y) * amount) / 1000) * boardSize - 14 + sway * 0.55 },
-        { rotate: `${amount * 1080}deg` },
-        { scale: interpolate(amount, [0, 0.36, 0.76, 1], [1, 1.18, 1.04, 0.72]) },
+        { translateX: ((from.x + (home.x - from.x) * amount) / 1000) * boardSize - 12 },
+        { translateY: ((from.y + (home.y - from.y) * amount) / 1000) * boardSize - 14 },
       ],
     };
   });
 
   return (
     <Animated.View pointerEvents="none" style={[styles.homecomingPanda, motionStyle]}>
-      <PandaToken color={color} carriedItem={carriedItem} />
+      <PandaToken
+        color={color}
+        carriedItem={carriedItem}
+        specialMove={bamboo && !bambooLanding ? 'bamboo' : null}
+        motionEffect={bamboo ? bambooLanding ? 'step' : 'bamboo' : 'boom'}
+        animationId={animationId}
+      />
     </Animated.View>
   );
 }
@@ -1019,26 +1224,32 @@ export function GameBoard({
         </Svg>
         {keyPickup && <KeyPickupAnimation key={`${keyPickup.playerId}-${keyPickup.square}`} square={keyPickup.square} />}
 
-        {game.players.map((player) => {
+        {game.players.map((player, playerIndex) => {
           const isWalking = walking?.playerId === player.id || walking?.playerIds?.includes(player.id) === true;
           const displayPosition = isWalking ? walking.position : player.position;
+          const bambooReturningHome = isWalking &&
+            walking.position === 0 &&
+            walking.sourcePosition === 100 &&
+            (walking.effect === 'bamboo' || walking.effect === 'step');
           if (
             displayPosition < 0 ||
-            isWalking && walking.effect === 'bamboo' && walking.position === 0 ||
+            bambooReturningHome ||
             bombBlast?.victims.some((victim) => victim.playerId === player.id)
           ) return null;
-          const stack = game.players.filter((other) => {
-            const otherIsWalking = walking?.playerId === other.id || walking?.playerIds?.includes(other.id) === true;
-            return (otherIsWalking ? walking.position : other.position) === displayPosition;
-          });
-          const stackIndex = stack.findIndex((other) => other.id === player.id);
-          const shift = (stackIndex - (stack.length - 1) / 2) * 11;
+          const stacked = game.players.some((other, otherIndex) => otherIndex !== playerIndex && other.position === displayPosition);
+          const shiftX = stacked ? playerIndex % 2 === 0 ? -8 : 8 : 0;
+          const shiftY = stacked
+            ? game.players.length > 2
+              ? playerIndex < 2 ? -7 : 7
+              : playerIndex === 0 ? -5 : 5
+            : 0;
           return (
             <AnimatedPawnSpot
               key={player.id}
               position={displayPosition}
               boardSize={boardSize}
-              shift={shift}
+              shiftX={shiftX}
+              shiftY={shiftY}
               effect={isWalking ? walking.effect : 'step'}
               animationId={isWalking ? walking.id : 0}
             >
@@ -1047,16 +1258,25 @@ export function GameBoard({
                 carriedItem={isWalking && walking.carriedItem !== undefined
                   ? walking.carriedItem
                   : player.crownKeyRoom !== null ? 'key' : player.hasTorch ? 'torch' : null}
+                specialMove={isWalking && (
+                  walking.effect === 'ladder' ||
+                  walking.effect === 'snake' ||
+                  walking.effect === 'boom' ||
+                  walking.effect === 'bamboo'
+                ) ? walking.effect : null}
+                motionEffect={isWalking ? walking.effect : 'step'}
+                animationId={isWalking ? walking.id : 0}
               />
             </AnimatedPawnSpot>
           );
         })}
-        {walking?.effect === 'bamboo' && walking.position === 0 && (() => {
+        {walking && walking.position === 0 && walking.sourcePosition === 100 &&
+          (walking.effect === 'bamboo' || walking.effect === 'step') && (() => {
           const player = game.players.find((item) => item.id === walking.playerId);
           if (!player) return null;
           return (
             <HomecomingPanda
-              key={`torch-return-${walking.id}`}
+              key={`bamboo-homecoming-${player.id}`}
               animationId={walking.id}
               color={player.color}
               carriedItem={walking.carriedItem ?? (player.crownKeyRoom !== null ? 'key' : player.hasTorch ? 'torch' : null)}
@@ -1064,11 +1284,13 @@ export function GameBoard({
               boardSize={boardSize}
               delay={0}
               duration={2600}
+              bamboo
+              bambooLanding={walking.effect === 'step'}
             />
           );
         })()}
         {bombBlast && <BombBlastVisual key={`blast-${bombBlast.id}`} blast={bombBlast} />}
-        {bombBlast?.victims.map((victim, index) => {
+        {bombBlast?.victims.map((victim) => {
           const player = game.players.find((item) => item.id === victim.playerId);
           if (!player) return null;
           return (
@@ -1079,7 +1301,7 @@ export function GameBoard({
               carriedItem={player.crownKeyRoom !== null ? 'key' : player.hasTorch ? 'torch' : null}
               fromSquare={victim.fromSquare}
               boardSize={boardSize}
-              delay={index * 150}
+              delay={0}
             />
           );
         })}
@@ -1351,6 +1573,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 5,
   },
+  pandaMotion: { alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  moveCaption: { position: 'absolute', top: -17, left: -31, width: 90, minHeight: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, borderWidth: 1, borderRadius: 10, borderColor: '#ffe7a1', backgroundColor: '#fff1bc', shadowColor: '#20152c', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.34, shadowRadius: 3, elevation: 3, zIndex: 30 },
+  moveCaptionText: { fontFamily: 'Fredoka_600SemiBold', fontSize: 8, lineHeight: 10 },
+  pandaSparkle: { position: 'absolute', width: 12, height: 12, alignItems: 'center', justifyContent: 'center', zIndex: 6 },
+  pandaSparkleLeft: { left: -6, top: 4 },
+  pandaSparkleRight: { right: -6, top: 1 },
+  pandaSparkleFoot: { right: -5, bottom: -3 },
   homecomingPanda: {
     position: 'absolute',
     left: 0,
