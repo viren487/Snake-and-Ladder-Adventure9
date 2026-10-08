@@ -988,10 +988,12 @@ export default function IndexScreen() {
     >
       <View style={styles.gameHeader}>
         <View style={styles.brandLockup}>
-          <Image source={require('../assets/images/icon.png')} style={styles.gameIcon} accessibilityLabel="Panda with a crown" />
+          <View style={[styles.brandMark, { backgroundColor: colors.secondary, borderColor: colors.primary }]}>
+            <MaterialCommunityIcons name="crown" size={22} color={colors.primary} />
+          </View>
           <View>
-            <Text style={[styles.gameBrand, { color: colors.foreground }]}>Snake & Ladder</Text>
-            <Text style={[styles.brandSubtitle, { color: colors.mutedForeground }]}>ADVENTURE</Text>
+            <Text style={[styles.gameBrand, { color: colors.foreground }]}>Snakes &amp; Ladders</Text>
+            <Text style={[styles.brandSubtitle, { color: colors.mutedForeground }]}>A TINY QUEST FOR TWO</Text>
           </View>
         </View>
         <View style={styles.row}>
@@ -1015,43 +1017,6 @@ export default function IndexScreen() {
       </View>
 
       {onlineMode && renderRoomCard(true)}
-      {!onlineMode && (
-        <View style={[styles.turnBanner, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-          <View style={[styles.statusDot, { backgroundColor: colorForPlayer(currentPlayer.color, colors) }]} />
-          <Text style={[styles.turnText, { color: colors.secondaryForeground }]}>{currentPlayer.name}{botTurn ? ' is thinking…' : ' to play'}</Text>
-          <Text style={[styles.modeTag, { color: colors.mutedForeground }]}>{localMode === 'bot' ? 'VS MR. BOT' : 'PASS & PLAY'}</Text>
-        </View>
-      )}
-
-      <View style={styles.playerStrip}>
-        {game.players.map((player, index) => {
-          const crowned = (game.winnerIds ?? []).includes(player.id) || game.winnerId === player.id;
-          return (
-            <View
-              key={player.id}
-              testID={`player-status-${player.id}`}
-              style={[
-                styles.playerCard,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: index === game.currentPlayerIndex && !game.winnerId ? colorForPlayer(player.color, colors) : colors.border,
-                  opacity: crowned ? 0.8 : 1,
-                },
-              ]}
-            >
-              <View style={[styles.playerDot, { backgroundColor: colorForPlayer(player.color, colors) }]} />
-              <View style={styles.playerMeta}>
-                <Text style={[styles.playerName, { color: colors.foreground }]} numberOfLines={1}>{player.name}</Text>
-                <Text style={[styles.playerPosition, { color: colors.mutedForeground }]}>
-                  {crowned ? 'CROWN CLAIMED' : player.position === 0 ? 'HOME' : `ROOM ${player.position}`}
-                </Text>
-              </View>
-              <Text style={[styles.ammoText, { color: colors.primary }]}>{player.bullets}/{5}</Text>
-            </View>
-          );
-        })}
-      </View>
-
       <GameBoard
         game={game}
         selectedTargets={selectedTargets}
@@ -1062,24 +1027,7 @@ export default function IndexScreen() {
         onChooseMystery={(power) => currentPowerAction({ type: 'choose', power }, (state) => choosePower(state, power))}
       />
 
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[styles.eyebrow, { color: colors.primary }]}>CROWN QUEST</Text>
-        <Text style={[styles.questTitle, { color: colors.foreground }]}>{playerProgress}</Text>
-        <View style={styles.questSteps}>
-          {[
-            { label: 'Torch', done: currentPlayer.hasTorch || currentPlayer.crownKeyRoom !== null || !!game.winnerId && game.winnerIds.includes(currentPlayer.id) },
-            { label: 'Key', done: currentPlayer.crownKeyRoom !== null || !!game.winnerId && game.winnerIds.includes(currentPlayer.id) },
-            { label: 'Crown', done: !!game.winnerId && game.winnerIds.includes(currentPlayer.id) },
-          ].map((step) => (
-            <View key={step.label} style={styles.questStep}>
-              <View style={[styles.questDot, { backgroundColor: step.done ? colors.accent : colors.muted }]} />
-              <Text style={[styles.questStepText, { color: step.done ? colors.accent : colors.mutedForeground }]}>{step.label}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      <View style={[styles.actionPanel, { backgroundColor: colors.card, borderColor: colors.border }]} testID="game-controls">
+      <View style={styles.actionPanel} testID="game-controls">
         {waitingForShot ? (
           <View style={[styles.aimFlow, { backgroundColor: colors.background, borderColor: colors.border }]} testID="fire-choice">
             <View style={styles.aimHeader}>
@@ -1185,8 +1133,6 @@ export default function IndexScreen() {
             />
           </View>
         )}
-        <Text style={[styles.gameMessage, { color: colors.foreground }]} accessibilityLiveRegion="polite" testID="game-message">{game.message}</Text>
-
         {onlineMode && roomStatus?.status === 'waiting' && (
           <Text style={[styles.note, { color: colors.mutedForeground }]}>Share the room code above. The round begins when all {roomStatus.maxPlayers} players are ready.</Text>
         )}
@@ -1252,6 +1198,80 @@ export default function IndexScreen() {
         {!!actionError && <Text style={[styles.errorText, { color: colors.destructive }]} accessibilityRole="alert">{actionError}</Text>}
         {!!online.error && <Text style={[styles.errorText, { color: colors.destructive }]} accessibilityRole="alert">{online.error}</Text>}
         {!!storageError && <Text style={[styles.note, { color: colors.mutedForeground }]}>{storageError}</Text>}
+      </View>
+
+      <View style={[styles.statusPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {!onlineMode && (
+          <View style={styles.turnBanner}>
+            <View style={[styles.statusDot, { backgroundColor: colorForPlayer(currentPlayer.color, colors) }]} />
+            <Text style={[styles.turnText, { color: colors.secondaryForeground }]}>{currentPlayer.name}{botTurn ? ' is thinking…' : ' to play'}</Text>
+            <Text style={[styles.modeTag, { color: colors.mutedForeground }]}>{localMode === 'bot' ? 'VS MR. BOT' : 'PASS & PLAY'}</Text>
+          </View>
+        )}
+        <View style={styles.playerStrip}>
+          {game.players.map((player, index) => {
+            const crowned = (game.winnerIds ?? []).includes(player.id) || game.winnerId === player.id;
+            return (
+              <View
+                key={player.id}
+                testID={`player-status-${player.id}`}
+                style={[
+                  styles.playerCard,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: index === game.currentPlayerIndex && !game.winnerId ? colorForPlayer(player.color, colors) : colors.border,
+                    opacity: crowned ? 0.8 : 1,
+                  },
+                ]}
+              >
+                <View style={[styles.playerDot, { backgroundColor: colorForPlayer(player.color, colors) }]} />
+                <View style={styles.playerMeta}>
+                  <Text style={[styles.playerName, { color: colors.foreground }]} numberOfLines={1}>{player.name}</Text>
+                  <Text style={[styles.playerPosition, { color: colors.mutedForeground }]}>
+                    {crowned ? 'CROWN CLAIMED' : player.position === 0 ? 'HOME' : `ROOM ${player.position}`}
+                  </Text>
+                </View>
+                <View style={styles.playerStats}>
+                  <View style={styles.playerStatGroup}>
+                    <MaterialCommunityIcons name="key-variant" size={11} color={colors.primary} />
+                    <Text style={[styles.playerStat, { color: colors.primary }]}>{player.crownKeyRoom !== null ? 1 : 0}/1</Text>
+                  </View>
+                  <View style={styles.playerStatGroup}>
+                    <Feather name="circle" size={10} color={colors.foreground} />
+                    <Text style={[styles.playerStat, { color: colors.foreground }]}>{player.bullets}/5</Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={[styles.questPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.questHeading}>
+          <Text style={[styles.eyebrow, { color: colors.primary }]}>CROWN QUEST</Text>
+          <Text style={[styles.questTitle, { color: colors.foreground }]}>{playerProgress}</Text>
+        </View>
+        <View style={styles.questSteps}>
+          {[
+            { label: 'Torch', done: currentPlayer.hasTorch || currentPlayer.crownKeyRoom !== null || !!game.winnerId && game.winnerIds.includes(currentPlayer.id), icon: 'flashlight' },
+            { label: 'Key', done: currentPlayer.crownKeyRoom !== null || !!game.winnerId && game.winnerIds.includes(currentPlayer.id), icon: 'key-variant' },
+            { label: 'Crown', done: !!game.winnerId && game.winnerIds.includes(currentPlayer.id), icon: 'crown' },
+          ].map((step, index) => (
+            <React.Fragment key={step.label}>
+              {index > 0 && <Text style={[styles.questDivider, { color: colors.mutedForeground }]}>›</Text>}
+              <View style={styles.questStep}>
+                <MaterialCommunityIcons name={step.icon as 'flashlight' | 'key-variant' | 'crown'} size={14} color={step.done ? colors.accent : colors.mutedForeground} />
+                <Text style={[styles.questStepText, { color: step.done ? colors.accent : colors.mutedForeground }]}>{step.label}</Text>
+              </View>
+            </React.Fragment>
+          ))}
+        </View>
+      </View>
+
+      <View style={[styles.messagePanel, { backgroundColor: colors.card, borderColor: colors.border }]} accessibilityLiveRegion="polite" testID="game-message">
+        <MaterialCommunityIcons name="creation" size={16} color={colors.primary} />
+        <Text style={[styles.gameMessage, { color: colors.foreground }]}>{game.message}</Text>
       </View>
 
       {!!game.winnerId && (
