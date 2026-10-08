@@ -23,6 +23,14 @@ The user explicitly chose a board-first launch on October 8, 2026. Wait for loca
 
 **How to apply:** Preserve this launch choice in future mobile navigation changes. Do not clear or replace saved rounds while selecting the latest round.
 
+## Mobile launch screen
+
+The launch loading screen is mobile-only and temporary; the game board remains the first destination after startup.
+
+**Why:** On October 9, 2026, the user asked for a loading page when opening the mobile app and explicitly said not to add it to the website. This is compatible with the earlier board-first choice because the loader is only a brief startup transition.
+
+**How to apply:** Keep the loader out of the web artifact and do not replace the resumed game board with a persistent intro or setup screen.
+
 ## React Native SVG web compatibility
 
 In this Expo web preview, `react-native-svg` forwards `accessible={false}` and `originX`/`originY` as invalid DOM attributes. For decorative SVGs, use `aria-hidden={true}`; for centered rotations, use the SVG `transform` string rather than legacy rotation/origin props.
