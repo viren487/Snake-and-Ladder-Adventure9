@@ -57,6 +57,7 @@ const MOBILE_PROFILE_STORAGE_KEY = 'snack-ladder-mobile-profile-v1';
 const MOVEMENT_STEP_DELAY_MS = 240;
 const SPECIAL_MOVE_DURATION_MS = { ladder: 2200, snake: 2000, boom: 2350, web: 1450, knife: 1250 } as const;
 const SPECIAL_MOVE_STYLE = {
+  '--step-move-duration': `${MOVEMENT_STEP_DELAY_MS}ms`,
   '--ladder-move-duration': `${SPECIAL_MOVE_DURATION_MS.ladder}ms`,
   '--snake-move-duration': `${SPECIAL_MOVE_DURATION_MS.snake}ms`,
   '--boom-move-duration': `${SPECIAL_MOVE_DURATION_MS.boom}ms`,

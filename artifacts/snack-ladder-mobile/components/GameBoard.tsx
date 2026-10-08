@@ -35,6 +35,8 @@ export type BoardBlast = {
   victims: { playerId: string; fromSquare: number }[];
 };
 
+export const MOVEMENT_STEP_DURATION_MS = 240;
+
 export type BoardMotion = {
   id: number;
   playerId: string;
@@ -522,12 +524,10 @@ function PandaMotion({
         withTiming(1, { duration: 376, easing: ease }),
       );
     } else {
-      const ease = Easing.bezier(0.2, 0.8, 0.25, 1);
-      progress.value = withSequence(
-        withTiming(0.38, { duration: 84, easing: ease }),
-        withTiming(0.70, { duration: 70, easing: ease }),
-        withTiming(1, { duration: 66, easing: ease }),
-      );
+      progress.value = withTiming(1, {
+        duration: MOVEMENT_STEP_DURATION_MS,
+        easing: Easing.linear,
+      });
     }
   }, [animationId, effect, progress, reduceMotion]);
 
@@ -634,14 +634,14 @@ function AnimatedPawnSpot({
           : effect === 'web' ? 1450
             : effect === 'knife' ? 1250
               : effect === 'bamboo' ? 180
-                : 210;
+                  : MOVEMENT_STEP_DURATION_MS;
     const easing = effect === 'ladder' ? Easing.bezier(0.35, 0.05, 0.3, 1)
       : effect === 'snake' ? Easing.bezier(0.4, 0.05, 0.55, 1)
         : effect === 'boom' ? Easing.bezier(0.18, 0.68, 0.18, 1)
           : effect === 'web' ? Easing.bezier(0.2, 0.76, 0.25, 1)
             : effect === 'knife' ? Easing.bezier(0.35, 0.02, 0.6, 1)
               : effect === 'bamboo' ? Easing.out(Easing.cubic)
-                : Easing.bezier(0.2, 0.8, 0.25, 1);
+                    : Easing.linear;
     x.value = withTiming(targetX, { duration, easing });
     y.value = withTiming(targetY, { duration, easing });
   }, [animationId, boardSize, effect, point.x, point.y, reduceMotion, x, y]);

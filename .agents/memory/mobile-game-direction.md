@@ -89,8 +89,8 @@ Do not rely on a timed smooth scroll to make short gameplay effects visible. Pos
 
 ## Snake and ladder movement
 
-Panda movement on mobile should reproduce the website's step hops, ladder climb, snake slide and bamboo return path rather than using a plain glide.
+Panda movement on mobile should reproduce the website's step hops, ladder climb, snake slide and bamboo return path. Ordinary steps should feel continuous rather than pausing sharply between squares.
 
-**Why:** On October 9, 2026, the user specifically asked for mobile panda movement to be the website version after noticing the two clients moved differently. They had earlier asked that snake and ladder movement be slower and playful.
+**Why:** On October 9, 2026, the user asked for mobile panda movement to match the website after noticing the two clients moved differently, then asked for the running movement to feel smoother.
 
-**How to apply:** Treat the website's timing, easing, body motion and return route as the source of truth. Keep native reduced-motion behavior and turn completion synchronized with the visible animation.
+**How to apply:** Treat the website's timing, easing, body motion and return route as the source of truth. Synchronize ordinary-step travel and body motion on both clients, while preserving native reduced-motion behavior and turn completion.
