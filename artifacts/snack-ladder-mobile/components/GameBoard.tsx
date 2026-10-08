@@ -631,11 +631,11 @@ export function GameBoard({
 const styles = StyleSheet.create({
   frame: {
     width: '100%',
-    maxWidth: 620,
+    maxWidth: 780,
     alignSelf: 'center',
     padding: 8,
     borderWidth: 2,
-    borderRadius: 22,
+    borderRadius: 25,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.26,
     shadowRadius: 16,
@@ -645,7 +645,7 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 1,
     borderWidth: 3,
-    borderRadius: 11,
+    borderRadius: 8,
     overflow: 'hidden',
     position: 'relative',
   },
