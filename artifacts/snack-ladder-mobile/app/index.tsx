@@ -17,6 +17,7 @@ import {
 import Animated, {
   cancelAnimation,
   Easing,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -83,9 +84,10 @@ type SavedRound = { id: string; mode: LocalMode; updatedAt: string; game: GameSt
 const ROUNDS_KEY = 'snack-ladder-mobile:saved-rounds:v1';
 const ONLINE_SEAT_KEY = 'snack-ladder-mobile:online-seat:v1';
 const PROFILE_KEY = 'snack-ladder-mobile:profile:v1';
-const LAUNCH_MIN_VISIBLE_MS = 3000;
 const LAUNCH_ARTWORK_SIZE = { width: 1024, height: 1536 } as const;
 const LAUNCH_PROGRESS_BAR = { left: 230, top: 1320, width: 574, height: 31 } as const;
+const LAUNCH_NATIVE_PROGRESS = 0.53;
+const LAUNCH_STORAGE_READY_PROGRESS = 0.82;
 const PLAYER_COLORS = ['blue', 'coral', 'green', 'purple'] as const;
 const MOVEMENT_STEP_DELAY_MS = MOVEMENT_STEP_INTERVAL_MS;
 const SPECIAL_MOVE_DURATION_MS = { ladder: 2280, snake: 2080, web: 1500, knife: 1300 } as const;
@@ -298,12 +300,16 @@ function Field({
 function MobileLaunchScreen({
   colors,
   reduceMotion,
+  progressTarget,
+  onProgressComplete,
 }: {
   colors: ReturnType<typeof useColors>;
   reduceMotion: boolean;
+  progressTarget: number;
+  onProgressComplete: () => void;
 }) {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
-  const progress = useSharedValue(0);
+  const progress = useSharedValue(Platform.OS === 'web' ? 0 : LAUNCH_NATIVE_PROGRESS);
   const scale = Math.max(
     viewport.width / LAUNCH_ARTWORK_SIZE.width,
     viewport.height / LAUNCH_ARTWORK_SIZE.height,
@@ -321,17 +327,20 @@ function MobileLaunchScreen({
   }), [barWidth]);
 
   useEffect(() => {
+    const completing = progressTarget >= 1;
     if (reduceMotion) {
-      progress.value = 1;
+      progress.value = progressTarget;
+      if (completing) onProgressComplete();
       return;
     }
-    progress.value = 0;
-    progress.value = withTiming(1, {
-      duration: LAUNCH_MIN_VISIBLE_MS,
-      easing: Easing.linear,
+    progress.value = withTiming(progressTarget, {
+      duration: completing ? 320 : 480,
+      easing: Easing.out(Easing.cubic),
+    }, (finished) => {
+      if (finished && completing) runOnJS(onProgressComplete)();
     });
     return () => cancelAnimation(progress);
-  }, [progress, reduceMotion]);
+  }, [onProgressComplete, progress, progressTarget, reduceMotion]);
 
   return (
     <View
@@ -395,7 +404,7 @@ export default function IndexScreen() {
   const [roomCode, setRoomCode] = useState('');
   const [savedRounds, setSavedRounds] = useState<SavedRound[]>([]);
   const [storageReady, setStorageReady] = useState(false);
-  const [launchMinimumElapsed, setLaunchMinimumElapsed] = useState(false);
+  const [launchProgressComplete, setLaunchProgressComplete] = useState(false);
   const [saveBlocked, setSaveBlocked] = useState(false);
   const [storageError, setStorageError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -615,7 +624,6 @@ export default function IndexScreen() {
 
   useEffect(() => {
     isMounted.current = true;
-    const launchTimer = setTimeout(() => setLaunchMinimumElapsed(true), LAUNCH_MIN_VISIBLE_MS);
     void (async () => {
       try {
         const [rawRounds, storedName] = await Promise.all([
@@ -650,7 +658,6 @@ export default function IndexScreen() {
       }
     })();
     return () => {
-      clearTimeout(launchTimer);
       isMounted.current = false;
       if (botTimer.current) clearTimeout(botTimer.current);
     };
@@ -721,6 +728,12 @@ export default function IndexScreen() {
   const showGame = screen === 'game' || (!!online.session && !!online.room);
   const game = online.session ? remoteDisplayGame ?? online.room?.game ?? null : localGame;
   const currentPlayer = game?.players[game.currentPlayerIndex] ?? null;
+  const launchReady = storageReady && !online.loadingSession && !!game && !!currentPlayer;
+  const launchProgressTarget = launchReady
+    ? 1
+    : storageReady ? LAUNCH_STORAGE_READY_PROGRESS
+      : Platform.OS === 'web' ? 0 : LAUNCH_NATIVE_PROGRESS;
+  const completeLaunchProgress = useCallback(() => setLaunchProgressComplete(true), []);
   useEffect(() => {
     if (!game) {
       previousBlastGame.current = null;
@@ -1290,9 +1303,14 @@ export default function IndexScreen() {
     </View>
   );
 
-  if (!storageReady || !launchMinimumElapsed || online.loadingSession) {
+  if (!launchReady || !launchProgressComplete) {
     return (
-      <MobileLaunchScreen colors={colors} reduceMotion={reduceMotion} />
+      <MobileLaunchScreen
+        colors={colors}
+        reduceMotion={reduceMotion}
+        progressTarget={launchProgressTarget}
+        onProgressComplete={completeLaunchProgress}
+      />
     );
   }
 
