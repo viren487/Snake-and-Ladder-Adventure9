@@ -3,11 +3,11 @@ name: Mobile artifact status
 description: Native mobile is active again; align its game screen with the website while preserving touch controls.
 ---
 
-The user explicitly resumed mobile work on October 8, 2026 and asked for its gameplay screen to visually match the website. Both the browser game and Expo app are active.
+The user explicitly resumed mobile work on October 8, 2026 and repeatedly asked for mobile's appearance and gameplay to match the website as closely as possible. Both the browser game and Expo app are active.
 
 **Why:** The web and mobile clients have separate UI implementations, so visual changes do not carry across automatically. The user noticed the difference and asked for parity.
 
-**How to apply:** Treat the website as the current feature baseline and keep its game UI, actions, feedback and animations aligned on native mobile, while retaining touch sizing and mobile-only saved rounds. Keep both clients aligned when a requested feature changes shared behavior. Do not build an APK unless explicitly asked.
+**How to apply:** Treat the phone-width website as the visual and behavior baseline for native mobile. Preserve touch sizing, board-first launch and all saved rounds; the user chose text-only room chat on mobile, so do not add voice unless they change that choice. Keep clients aligned when gameplay changes. Do not build an APK unless explicitly asked.
 
 ## Mobile testing
 

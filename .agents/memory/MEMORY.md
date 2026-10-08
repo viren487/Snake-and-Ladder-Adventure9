@@ -1,4 +1,4 @@
-- [Mobile artifact status](mobile-game-direction.md) — Native mobile is active again; align its game screen with web while preserving touch controls and browser gameplay.
+- [Mobile artifact status](mobile-game-direction.md) — Treat phone-width web as the mobile UI/gameplay baseline; preserve touch input, saved rounds, and text-only room chat.
 - [Torch and crown quest](crown-quest.md) — First arrival at 100 grants a torch and returns the player Home; keys exist only in black rooms 17, 44 and 67.
 - [Extra rolls and mystery powers](mystery-powers.md) — Valid sixes grant another chance; players choose powers, and bomb owners may detonate themselves immediately.
 - [Online multiplayer scope](online-multiplayer.md) — 2–4 people on separate devices; N−1 finishers win, last loses; preserve local saves and original seats.

@@ -11,8 +11,10 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -222,12 +224,14 @@ function SmallIconButton({
   onPress,
   colors,
   testID,
+  compact = false,
 }: {
   label: string;
   icon: React.ReactNode;
   onPress: () => void;
   colors: ReturnType<typeof useColors>;
   testID?: string;
+  compact?: boolean;
 }) {
   return (
     <Pressable
@@ -235,7 +239,7 @@ function SmallIconButton({
       accessibilityLabel={label}
       testID={testID}
       onPress={onPress}
-      style={({ pressed }) => [styles.iconButton, { borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
+      style={({ pressed }) => [styles.iconButton, compact && styles.iconButtonCompact, { borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]}
     >
       {icon}
     </Pressable>
@@ -283,10 +287,12 @@ function Field({
 export default function IndexScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const sounds = useGameSounds();
   const muted = sounds.muted;
   const [screen, setScreen] = useState<Screen>('game');
   const [localMode, setLocalMode] = useState<LocalMode>('pass');
+  const [modeMenuOpen, setModeMenuOpen] = useState(false);
   const [localGame, setLocalGame] = useState<GameState | null>(null);
   const [localRoundId, setLocalRoundId] = useState<string | null>(null);
   const [playerName, setPlayerName] = useState('Player 1');
@@ -826,6 +832,21 @@ export default function IndexScreen() {
     }
   };
 
+  const switchLocalMode = (mode: LocalMode) => {
+    setModeMenuOpen(false);
+    if (mode === localMode || online.session || !storageReady) return;
+    const savedModeRound = savedRounds
+      .filter((round) => round.mode === mode)
+      .sort((first, second) => Date.parse(second.updatedAt) - Date.parse(first.updatedAt))[0];
+    if (savedModeRound) resumeRound(savedModeRound);
+    else startLocalGame(mode);
+  };
+
+  const chooseLocalMode = () => {
+    if (online.session || !storageReady || rolling || firing) return;
+    setModeMenuOpen((open) => !open);
+  };
+
   const deleteRound = (id: string) => {
     const task = saveQueue.current.catch(() => undefined).then(async () => {
       const stored = parseRounds(await AsyncStorage.getItem(ROUNDS_KEY));
@@ -1320,12 +1341,25 @@ export default function IndexScreen() {
     );
   }
 
-  const winningPlayers = game.players.filter((player) => (game.winnerIds ?? []).includes(player.id));
-  const losingPlayer = game.players.find((player) => player.id === game.loserId);
   const onlineMode = !!online.session;
   const turnLocked = actionDisabled || !currentPlayerIsHuman;
   const noUnspentLandingChoice = !game.pendingChoice && !game.pendingFireForPlayerId;
   const powerButtons = currentPlayer.powers;
+  const inventoryBombs = game.bombs
+    .filter((bomb) => {
+      const owner = game.players.find((player) => player.id === bomb.ownerId);
+      const ready = owner?.position === bomb.square || bomb.armed && game.players.some((player) =>
+        player.id !== bomb.ownerId && player.position === bomb.square && !game.winnerIds?.includes(player.id));
+      return !(bomb.ownerId === currentPlayer.id && ready);
+    })
+    .map((bomb) => ({
+      id: bomb.id,
+      square: bomb.square,
+      ownerName: game.players.find((player) => player.id === bomb.ownerId)?.name ?? 'Player',
+      owned: bomb.ownerId === currentPlayer.id,
+      ready: game.players.find((player) => player.id === bomb.ownerId)?.position === bomb.square ||
+        bomb.armed && game.players.some((player) => player.id !== bomb.ownerId && player.position === bomb.square),
+    }));
   const webTargets = activeRivals.filter((rival) =>
     powerButtons.webShooter > 0 && rival.position > currentPlayer.position && rival.position - currentPlayer.position <= 3);
   const knifeTargets = activeRivals.filter((rival) =>
@@ -1532,30 +1566,56 @@ export default function IndexScreen() {
           </View>
         </View>
         <View style={styles.gameHeaderActions}>
-          {!onlineMode && (
-            <View style={[styles.localModeChip, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-              <View style={[styles.statusDot, { backgroundColor: colors.accent }]} />
-              <View>
-                <Text style={[styles.localModeCaption, { color: colors.mutedForeground }]}>LOCAL</Text>
-                <Text style={[styles.localModeName, { color: colors.foreground }]}>{localMode === 'bot' ? 'VS MR. BOT' : 'PASS & PLAY'}</Text>
-              </View>
-            </View>
-          )}
           <SmallIconButton
-            label={muted ? 'Turn sound on' : 'Mute sound'}
+            label={muted ? 'Enable sound effects' : 'Mute sound effects'}
             onPress={() => sounds.toggleMuted()}
             colors={colors}
             icon={<Feather name={muted ? 'volume-x' : 'volume-2'} size={17} color={colors.foreground} />}
             testID="sound-toggle"
+            compact
           />
-          {!onlineMode && (
-            <SmallIconButton
-              label="New game setup"
-              onPress={() => setScreen('home')}
-              colors={colors}
-              icon={<Feather name="plus" size={17} color={colors.foreground} />}
-              testID="open-new-game"
-            />
+          {!onlineMode && windowWidth > 390 && (
+            <View style={styles.modePickerWrap}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={localMode === 'bot' ? 'Local game mode, playing Mr. Bot' : 'Local game mode, Pass and Play'}
+                accessibilityState={{ expanded: modeMenuOpen }}
+                onPress={chooseLocalMode}
+                disabled={!storageReady || rolling || firing}
+                style={[styles.localModeChip, { backgroundColor: colors.secondary, borderColor: colors.border, opacity: !storageReady || rolling || firing ? 0.65 : 1 }]}
+                testID="game-mode"
+              >
+                <View style={[styles.statusDot, { backgroundColor: colors.accent }]} />
+                <Text style={[styles.localModeCaption, { color: colors.mutedForeground }]}>LOCAL ·</Text>
+                <Text style={[styles.localModeName, { color: colors.foreground }]}>{localMode === 'bot' ? 'VS. MR. BOT' : 'PASS & PLAY'}</Text>
+                <Feather name="chevron-down" size={12} color={colors.mutedForeground} />
+              </Pressable>
+              {modeMenuOpen && (
+                <View style={[styles.modeMenu, { backgroundColor: colors.card, borderColor: colors.border }]} testID="game-mode-options">
+                  {([
+                    { mode: 'pass', label: 'Pass & Play' },
+                    { mode: 'bot', label: 'vs. Mr.Bot' },
+                  ] as const).map((option) => (
+                    <Pressable
+                      key={option.mode}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: localMode === option.mode }}
+                      onPress={() => switchLocalMode(option.mode)}
+                      style={[styles.modeMenuItem, { backgroundColor: localMode === option.mode ? colors.secondary : 'transparent' }]}
+                    >
+                      <Text style={[styles.modeMenuLabel, { color: colors.foreground }]}>{option.label}</Text>
+                      {localMode === option.mode && <Feather name="check" size={14} color={colors.accent} />}
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+          {onlineMode && windowWidth > 390 && (
+            <View style={[styles.localModeChip, { backgroundColor: colors.secondary, borderColor: colors.border }]} testID="game-mode">
+              <View style={[styles.statusDot, { backgroundColor: colors.accent }]} />
+              <Text style={[styles.localModeName, { color: colors.foreground }]}>ONLINE · TWO DEVICES</Text>
+            </View>
           )}
         </View>
       </View>
@@ -1699,6 +1759,19 @@ export default function IndexScreen() {
         mysteryBusy={actionDisabled}
         onChooseMystery={(power) => currentPowerAction({ type: 'choose', power }, (state) => choosePower(state, power))}
       />
+      {!!game.winnerId && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Play celebration music"
+          disabled={sounds.muted}
+          onPress={() => sounds.setCelebrating(true)}
+          style={[styles.celebrationMusicButton, { borderColor: colors.border, opacity: sounds.muted ? 0.45 : 1 }]}
+          testID="celebration-music"
+        >
+          <Feather name="music" size={13} color={colors.foreground} />
+          <Text style={[styles.celebrationMusicLabel, { color: colors.foreground }]}>Play celebration music</Text>
+        </Pressable>
+      )}
 
       <View style={styles.actionPanel} testID="game-controls">
         <View style={waitingForShot ? styles.controlDockAiming : styles.controlDock}>
@@ -1710,6 +1783,7 @@ export default function IndexScreen() {
               onSelect={(power) => setActivePower((current) => current === power ? null : power)}
               disabled={turnLocked}
               centerControl={renderDiceButton()}
+              bombs={inventoryBombs}
             />
             {renderPowerDetails()}
           </View>
@@ -1806,6 +1880,12 @@ export default function IndexScreen() {
         ) : !game.winnerId && !currentPlayerIsHuman ? (
           <View style={styles.rollDock}>{renderDiceButton()}</View>
         ) : null}
+        {!!game.winnerId && (
+          <View style={[styles.winBanner, { backgroundColor: colors.accent, borderColor: colors.accent }]}>
+            <MaterialCommunityIcons name="crown" size={15} color={colors.accentForeground} />
+            <Text style={[styles.winBannerText, { color: colors.accentForeground }]}>Crown claimed!</Text>
+          </View>
+        )}
         </View>
         {onlineMode && roomStatus?.status === 'waiting' && (
           <Text style={[styles.note, { color: colors.mutedForeground }]}>Share the room code above. The round begins when all {roomStatus.maxPlayers} players are ready.</Text>
@@ -1901,25 +1981,25 @@ export default function IndexScreen() {
         <Text style={[styles.gameMessage, { color: colors.foreground }]}>{game.message}</Text>
       </View>
 
-      {!onlineMode && !game.winnerId && (
-        <SolidButton
-          label="New Game"
-          icon={<Feather name="plus" size={16} color={colors.primaryForeground} />}
+      {!onlineMode && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="New game"
           onPress={() => setScreen('home')}
-          colors={colors}
+          style={({ pressed }) => [styles.webNewGameButton, pressed && styles.webNewGameButtonPressed]}
           testID="button-new-game"
-        />
+        >
+          <LinearGradient colors={['#ffdc79', '#e9a938']} style={styles.webNewGameGradient}>
+            <Feather name="rotate-ccw" size={15} color="#3e2a18" />
+            <Text style={styles.webNewGameLabel}>New game</Text>
+          </LinearGradient>
+        </Pressable>
       )}
 
-      {!!game.winnerId && (
-        <View style={[styles.card, { backgroundColor: colors.accent, borderColor: colors.accent }]}>
-          <Text style={[styles.questTitle, { color: colors.accentForeground }]}>{winningPlayers.map((player) => player.name).join(', ')} claimed the crown!</Text>
-          <Text style={[styles.body, { color: colors.accentForeground }]}>
-            {losingPlayer ? `${losingPlayer.name} finished last and loses; the other players win.` : 'The finish order is complete.'}
-          </Text>
-          {!onlineMode && <SolidButton label="Start a new round" onPress={() => setScreen('home')} colors={colors} secondary />}
-        </View>
-      )}
+      <View style={styles.panelFooter}>
+        <Text style={[styles.panelFooterText, { color: colors.mutedForeground }]}>TURN {String(game.turnNumber).padStart(2, '0')}</Text>
+        <Text style={[styles.panelFooterText, { color: colors.mutedForeground }]}>YOUR TABLE, YOUR QUEST</Text>
+      </View>
     </ScrollView>
   );
 }
@@ -1981,6 +2061,7 @@ export default function IndexScreen() {
   buttonLabel: { fontFamily: 'Nunito_700Bold', fontSize: 14 },
   buttonLabelCompact: { fontSize: 12 },
   iconButton: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  iconButtonCompact: { width: 36, height: 36, borderRadius: 11 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   chatToggle: { minHeight: 40, paddingHorizontal: 12, borderWidth: 1, borderRadius: 13, flexDirection: 'row', alignItems: 'center', gap: 8 },
   chatToggleText: { flex: 1, fontFamily: 'Nunito_700Bold', fontSize: 12 },
@@ -2003,13 +2084,17 @@ export default function IndexScreen() {
   roundAction: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   errorText: { fontFamily: 'Nunito_700Bold', fontSize: 12, lineHeight: 17 },
   gameHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, minHeight: 46, marginBottom: 2 },
-  gameHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 0 },
+  gameHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 0, zIndex: 20 },
+  modePickerWrap: { position: 'relative', zIndex: 21 },
+  modeMenu: { position: 'absolute', top: 40, right: 0, width: 154, padding: 5, borderWidth: 1, borderRadius: 12, zIndex: 30, elevation: 8, shadowColor: '#080b14', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.32, shadowRadius: 10 },
+  modeMenuItem: { minHeight: 38, paddingHorizontal: 9, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  modeMenuLabel: { fontFamily: 'Nunito_700Bold', fontSize: 12 },
   brandLockup: { flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 },
   brandMark: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   gameBrandCopy: { flex: 1, minWidth: 0 },
   gameBrand: { fontFamily: 'Fredoka_600SemiBold', fontSize: 20, lineHeight: 24 },
   gameBrandSubtitle: { fontFamily: 'monospace', fontSize: 8, letterSpacing: 1.15, marginTop: 1 },
-  localModeChip: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 32, paddingHorizontal: 9, borderWidth: 1, borderRadius: 99 },
+  localModeChip: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, paddingHorizontal: 9, borderWidth: 1, borderRadius: 99 },
   localModeCaption: { fontFamily: 'monospace', fontSize: 7, letterSpacing: 0.7 },
   localModeName: { fontFamily: 'monospace', fontSize: 7, letterSpacing: 0.2 },
   statusPanel: { padding: 0, borderRadius: 0, borderWidth: 0, gap: 0, backgroundColor: 'transparent' },
@@ -2032,7 +2117,7 @@ export default function IndexScreen() {
   questDivider: { fontFamily: 'Fredoka_600SemiBold', fontSize: 17 },
   actionPanel: { paddingVertical: 1, borderRadius: 0, borderWidth: 0, gap: 10 },
   actionTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  controlDock: { width: '100%', minHeight: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 2 },
+  controlDock: { width: '100%', minHeight: 94, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 2 },
   controlDockAiming: { width: '100%' },
   rollDock: { alignItems: 'center', justifyContent: 'center', paddingVertical: 2 },
   diceButton: {
@@ -2065,8 +2150,18 @@ export default function IndexScreen() {
   aimLeaveLink: { minHeight: 26, justifyContent: 'center', paddingHorizontal: 12 },
   aimLeaveLabel: { fontFamily: 'Nunito_700Bold', fontSize: 11 },
   diceResult: { fontFamily: 'Fredoka_600SemiBold', fontSize: 30, lineHeight: 34 },
-  messagePanel: { flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 1, gap: 8 },
+  messagePanel: { flexDirection: 'row', alignItems: 'center', padding: 14, minHeight: 66, borderRadius: 15, borderWidth: 1, gap: 10 },
   gameMessage: { flex: 1, fontFamily: 'Nunito_600SemiBold', fontSize: 12, lineHeight: 17 },
+  webNewGameButton: { width: '100%', minHeight: 52, borderWidth: 1, borderColor: '#ffe08a', borderRadius: 12, overflow: 'hidden', shadowColor: '#9a5a20', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.7, shadowRadius: 6, elevation: 4 },
+  webNewGameButtonPressed: { transform: [{ translateY: 2 }], shadowOpacity: 0.35, elevation: 2 },
+  webNewGameGradient: { minHeight: 50, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  webNewGameLabel: { color: '#3e2a18', fontFamily: 'Fredoka_600SemiBold', fontSize: 15 },
+  celebrationMusicButton: { alignSelf: 'flex-start', minHeight: 34, marginTop: 2, marginBottom: 2, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 10 },
+  celebrationMusicLabel: { fontFamily: 'Nunito_700Bold', fontSize: 11 },
+  winBanner: { minHeight: 42, alignSelf: 'center', marginTop: 5, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderRadius: 13 },
+  winBannerText: { fontFamily: 'Fredoka_600SemiBold', fontSize: 14 },
+  panelFooter: { width: '100%', marginTop: 2, paddingHorizontal: 3, paddingTop: 3, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  panelFooterText: { fontFamily: 'monospace', fontSize: 8, letterSpacing: 0.7 },
   choiceBlock: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.12)', paddingTop: 10, gap: 8 },
   sectionLabel: { fontFamily: 'Nunito_700Bold', fontSize: 12 },
 });
