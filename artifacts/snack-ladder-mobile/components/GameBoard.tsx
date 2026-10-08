@@ -2,7 +2,17 @@ import React from 'react';
 import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle, Ellipse, Image as SvgImage, Path } from 'react-native-svg';
+import Svg, {
+  Circle,
+  Defs,
+  Ellipse,
+  G,
+  Image as SvgImage,
+  LinearGradient as SvgLinearGradient,
+  Path,
+  Rect,
+  Stop,
+} from 'react-native-svg';
 import Animated, {
   Easing,
   interpolate,
@@ -163,7 +173,100 @@ function centerForSquare(square: number) {
       }
     }
   }
-  return { x: 50, y: 950, row: 9, column: 0 };
+  return { x: 70, y: 948, row: 9, column: 0 };
+}
+
+function BambooReturnArt({ active, torchVisible, collecting }: { active: boolean; torchVisible: boolean; collecting: boolean }) {
+  const top = 50;
+  const bottom = 948;
+  const x = 24;
+  const path = `M${x - 9} ${top} L${x + 9} ${top} L${x + 16} ${bottom} L${x - 16} ${bottom}Z`;
+  const nodes = Array.from({ length: 10 }, (_, index) => top + 40 + index * ((bottom - top - 80) / 9));
+  const leaves = [
+    { y: top + 64, angles: [-30, -10, 15, 38, 200, 165] },
+    { y: nodes[4] + 2, angles: [-20, 20, 160] },
+    { y: nodes[7] + 2, angles: [-15, 25, 170] },
+  ];
+  return (
+    <Svg
+      style={styles.bambooArt}
+      viewBox="0 0 100 1000"
+      preserveAspectRatio="none"
+      pointerEvents="none"
+      aria-hidden={true}
+      testID="bamboo-return-path"
+    >
+      <Defs>
+        <SvgLinearGradient id="mobile-bamboo-stalk" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor="#4d6b1f" />
+          <Stop offset=".3" stopColor="#a7bf4a" />
+          <Stop offset=".55" stopColor="#7d9a2e" />
+          <Stop offset="1" stopColor="#3a5217" />
+        </SvgLinearGradient>
+        <SvgLinearGradient id="mobile-bamboo-node" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor="#5c4a1c" />
+          <Stop offset=".4" stopColor="#c2a64f" />
+          <Stop offset="1" stopColor="#4a3a14" />
+        </SvgLinearGradient>
+        <SvgLinearGradient id="mobile-bamboo-leaf" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor="#4f8a2f" />
+          <Stop offset="1" stopColor="#9bc34a" />
+        </SvgLinearGradient>
+        <SvgLinearGradient id="mobile-bamboo-glow" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#fffbd0" stopOpacity=".94" />
+          <Stop offset=".5" stopColor="#ffdf62" stopOpacity=".58" />
+          <Stop offset="1" stopColor="#ff8b24" stopOpacity="0" />
+        </SvgLinearGradient>
+      </Defs>
+      <G transform="translate(40 0)">
+        <Path d={path} fill="none" stroke="#f6d86a" strokeWidth={9} strokeLinejoin="round" opacity={active ? 0.8 : 0} />
+        <Path d={path} fill="url(#mobile-bamboo-stalk)" stroke="#33481a" strokeWidth={1.5} />
+        <Path d={`M${x - 3} ${top + 6} L${x - 4} ${bottom - 6}`} stroke="#e4efa6" strokeWidth={2} opacity={0.45} strokeLinecap="round" />
+        {nodes.map((y, index) => {
+          const width = 9 + ((y - top) / (bottom - top)) * 7 + 3;
+          return (
+            <G key={`bamboo-node-${index}`}>
+              <Rect x={x - width} y={y - 4} width={width * 2} height={8} rx={4} fill="url(#mobile-bamboo-node)" stroke="#3b2d0e" strokeWidth={0.8} />
+              <Path d={`M${x - width + 2} ${y - 1.5}H${x + width - 2}`} stroke="#f2e2a0" strokeWidth={1} opacity={0.5} />
+            </G>
+          );
+        })}
+        {leaves.map((group, groupIndex) => group.angles.map((angle, leafIndex) => {
+          const scale = groupIndex === 0 ? 0.9 : 0.78;
+          const leafX = x + (groupIndex === 0 ? 6 : groupIndex === 1 ? 12 : 14);
+          return (
+            <Path
+              key={`bamboo-leaf-${groupIndex}-${leafIndex}`}
+              transform={`translate(${leafX} ${group.y + (leafIndex % 2) * 6}) rotate(${angle}) scale(${scale})`}
+              d="M0 0C10 -6 30 -6 46 0C30 6 10 6 0 0Z"
+              fill="url(#mobile-bamboo-leaf)"
+              stroke="#2f5a22"
+              strokeWidth={0.8}
+            />
+          );
+        }))}
+        {nodes.filter((_, index) => index % 3 === 1).map((y, index) => (
+          <Path key={`bamboo-shoot-${index}`} d={`M${x + 12} ${y}q10 -10 22 -8`} stroke="#4a7a2a" strokeWidth={2.5} fill="none" strokeLinecap="round" />
+        ))}
+        {torchVisible && (
+          <G transform={`translate(${x + 15} ${top + 128})`}>
+            <Ellipse cx={0} cy={48} rx={31} ry={47} fill="url(#mobile-bamboo-glow)" opacity={0.95} />
+            <Path d="M0 0c-10-12-25-7-21 3 3 7 14 4 21-3 7 7 18 10 21 3C25-7 10-12 0 0Z" fill="#c64035" stroke="#7e211e" strokeWidth={2} />
+            <Path d="M-8 7-13 24-6 20 0 11 6 20 13 24 8 7" fill="#e4513b" stroke="#7e211e" strokeWidth={1.5} strokeLinejoin="round" />
+            <Path d="M0 8v19" stroke="#f3c95f" strokeWidth={2} />
+            <Path d="M-8 27h16l3 7-4 4-1 17h-12l-1-17-4-4z" fill="#d6dce1" stroke="#3b3f42" strokeWidth={2} strokeLinejoin="round" />
+            <Path d="M-6 30h12M-5 51h10" stroke="#ffd34e" strokeWidth={2} strokeLinecap="round" />
+          </G>
+        )}
+        {collecting && (
+          <G transform={`translate(${x + 20} ${top + 165})`}>
+            <Circle r={18} fill="none" stroke="#fff4a1" strokeWidth={3} />
+            <Path d="M0-29v-9M0 29v9M-29 0h-9M29 0h9M-20-20l-7-7M20 20l7 7M20-20l7-7M-20 20l-7 7" stroke="#fff4a1" strokeWidth={3} strokeLinecap="round" />
+          </G>
+        )}
+      </G>
+    </Svg>
+  );
 }
 
 type TileFeature = 'bullet' | 'mystery' | 'gun' | 'bomb' | 'crown';
@@ -920,7 +1023,7 @@ export function GameBoard({
           const isWalking = walking?.playerId === player.id || walking?.playerIds?.includes(player.id) === true;
           const displayPosition = isWalking ? walking.position : player.position;
           if (
-            displayPosition <= 0 ||
+            displayPosition < 0 ||
             isWalking && walking.effect === 'bamboo' && walking.position === 0 ||
             bombBlast?.victims.some((victim) => victim.playerId === player.id)
           ) return null;
@@ -993,6 +1096,26 @@ export function GameBoard({
         )}
         <WinnerCelebration game={game} />
       </Animated.View>
+      <BambooReturnArt
+        active={walking?.effect === 'bamboo'}
+        torchVisible={
+          !game.players[game.currentPlayerIndex]?.hasTorch &&
+          game.players[game.currentPlayerIndex]?.crownKeyRoom === null &&
+          !(walking?.effect === 'bamboo' && walking.position === 100)
+        }
+        collecting={walking?.effect === 'bamboo' && walking.position === 100}
+      />
+      <Svg pointerEvents="none" style={styles.homeRoof} viewBox="0 0 100 75" aria-hidden={true}>
+        <Path d="M6 42 50 7l44 35-8 9-36-28L14 51z" fill="#df4e36" stroke="#ffd77a" strokeWidth={5} strokeLinejoin="round" />
+        <Path d="M20 44h60v26H20z" fill="#edbd62" stroke="#7d421f" strokeWidth={4} />
+        <Path d="M43 52h15v18H43z" fill="#714022" />
+      </Svg>
+      <View pointerEvents="none" style={styles.homeBadge} testID="home-base">
+        <LinearGradient colors={['#fff0a5', '#e99424', '#9c4217']} style={styles.homeBadgeGradient}>
+          <MaterialCommunityIcons name="creation" size={12} color="#fff7d3" />
+          <Text style={styles.homeBadgeText}>START</Text>
+        </LinearGradient>
+      </View>
     </View>
   );
 }
@@ -1004,22 +1127,28 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     padding: 8,
     borderWidth: 2,
-    borderRadius: 25,
+    borderRadius: 16,
+    position: 'relative',
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.42,
     shadowRadius: 22,
     elevation: 9,
   },
-  frameGradient: { ...StyleSheet.absoluteFill, borderRadius: 23 },
-  frameInset: { position: 'absolute', top: 5, left: 5, right: 5, bottom: 5, borderWidth: 1, borderColor: '#ffe596', borderRadius: 18, opacity: 0.75 },
+  frameGradient: { ...StyleSheet.absoluteFill, borderRadius: 14 },
+  frameInset: { position: 'absolute', top: 4, left: 4, right: 4, bottom: 4, borderWidth: 1, borderColor: '#ffe596', borderRadius: 12, opacity: 0.75 },
   inner: {
     width: '100%',
     aspectRatio: 1,
-    borderWidth: 3,
+    borderWidth: 2,
     borderRadius: 8,
-    overflow: 'hidden',
+    overflow: 'visible',
     position: 'relative',
   },
+  bambooArt: { position: 'absolute', left: '-10%', top: 0, width: '10%', height: '100%', zIndex: 4 },
+  homeRoof: { position: 'absolute', left: '-3%', bottom: '3%', width: '12%', height: '9%', zIndex: 5 },
+  homeBadge: { position: 'absolute', left: '-2.5%', bottom: '-1.5%', zIndex: 7, borderWidth: 2, borderColor: '#ffe278', borderRadius: 9, overflow: 'hidden', shadowColor: '#291407', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.45, shadowRadius: 3, elevation: 4 },
+  homeBadgeGradient: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingVertical: 2, paddingRight: 6, paddingLeft: 2 },
+  homeBadgeText: { color: '#fff7d3', fontFamily: 'Fredoka_600SemiBold', fontSize: 8, letterSpacing: 0.8, textShadowColor: '#6d2c10', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1 },
   mysteryTray: {
     position: 'absolute',
     left: '50%',
@@ -1049,6 +1178,8 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     flexDirection: 'row',
     flexWrap: 'wrap',
+    overflow: 'hidden',
+    borderRadius: 5,
   },
   cell: {
     width: '10%',
