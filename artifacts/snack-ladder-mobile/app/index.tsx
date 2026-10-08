@@ -85,7 +85,7 @@ type SavedRound = { id: string; mode: LocalMode; updatedAt: string; game: GameSt
 const ROUNDS_KEY = 'snack-ladder-mobile:saved-rounds:v1';
 const ONLINE_SEAT_KEY = 'snack-ladder-mobile:online-seat:v1';
 const PROFILE_KEY = 'snack-ladder-mobile:profile:v1';
-const LAUNCH_MIN_VISIBLE_MS = 0;
+const LAUNCH_MIN_VISIBLE_MS = 900;
 const PLAYER_COLORS = ['blue', 'coral', 'green', 'purple'] as const;
 const MOVEMENT_STEP_DELAY_MS = 240;
 const SPECIAL_MOVE_DURATION_MS = { ladder: 2280, snake: 2080, web: 1500, knife: 1300 } as const;
@@ -2076,6 +2076,12 @@ export default function IndexScreen() {
         <View style={styles.playerStrip}>
           {game.players.map((player, index) => {
             const crowned = (game.winnerIds ?? []).includes(player.id) || game.winnerId === player.id;
+            const winnerIndex = (game.winnerIds ?? []).indexOf(player.id);
+            const playerLabel = winnerIndex >= 0
+              ? `${player.name} · Winner ${winnerIndex + 1}`
+              : game.loserId === player.id
+                ? `${player.name} · Last`
+                : player.name;
             return (
               <View
                 key={player.id}
@@ -2091,9 +2097,9 @@ export default function IndexScreen() {
               >
                 <View style={[styles.playerDot, { backgroundColor: colorForPlayer(player.color, colors) }]} />
                 <View style={styles.playerMeta}>
-                  <Text style={[styles.playerName, { color: colors.foreground }]} numberOfLines={1}>{player.name}</Text>
+                  <Text style={[styles.playerName, { color: colors.foreground }]} numberOfLines={1}>{playerLabel}</Text>
                   <Text style={[styles.playerPosition, { color: colors.mutedForeground }]}>
-                    {crowned ? 'CROWN CLAIMED' : player.position === 0 ? 'HOME' : `ROOM ${player.position}`}
+                    {player.position === 0 ? 'HOME' : `#${player.position}`}
                   </Text>
                 </View>
                 <View style={styles.playerStats}>
@@ -2215,7 +2221,7 @@ export default function IndexScreen() {
   note: { fontFamily: 'Nunito_600SemiBold', fontSize: 11, lineHeight: 16 },
   roomBadge: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   roomCode: { fontFamily: 'Nunito_700Bold', fontSize: 18, letterSpacing: 2 },
-  onlineEntry: { marginBottom: 10, borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
+  onlineEntry: { marginBottom: 3, borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
   onlineEntryToggle: { minHeight: 46, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   onlineEntryTitle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   onlineEntryLabel: { fontFamily: 'Fredoka_600SemiBold', fontSize: 14 },
@@ -2273,21 +2279,21 @@ export default function IndexScreen() {
   turnBanner: { display: 'none', minHeight: 28, borderRadius: 0, borderWidth: 0, paddingHorizontal: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
   turnText: { flex: 1, fontFamily: 'Nunito_700Bold', fontSize: 14 },
   playerStrip: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  playerCard: { flex: 1, flexBasis: 140, minWidth: 0, minHeight: 44, borderRadius: 10, borderWidth: 1, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  playerDot: { width: 9, height: 9, borderRadius: 5 },
-  playerMeta: { flex: 1, minWidth: 0 },
-  playerName: { fontFamily: 'Nunito_700Bold', fontSize: 12 },
-  playerPosition: { fontFamily: 'monospace', fontSize: 8, letterSpacing: 0.4 },
-  playerStats: { alignItems: 'flex-end', gap: 3 },
-  playerStatGroup: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  playerStat: { fontFamily: 'monospace', fontSize: 9 },
+  playerCard: { flex: 1, flexBasis: 140, minWidth: 0, minHeight: 32, borderRadius: 10, borderWidth: 1, paddingHorizontal: 7, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  playerDot: { width: 10, height: 10, borderRadius: 5 },
+  playerMeta: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  playerName: { flexShrink: 1, minWidth: 0, fontFamily: 'Nunito_700Bold', fontSize: 10 },
+  playerPosition: { flexShrink: 0, fontFamily: 'monospace', fontSize: 9, letterSpacing: 0.2 },
+  playerStats: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  playerStatGroup: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  playerStat: { fontFamily: 'monospace', fontSize: 8 },
   questPanel: { alignSelf: 'center', paddingHorizontal: 4, paddingVertical: 3 },
   questTitle: { fontFamily: 'Fredoka_600SemiBold', fontSize: 16, lineHeight: 20 },
   questSteps: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
   questStep: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   questStepText: { fontFamily: 'Nunito_700Bold', fontSize: 11 },
   questDivider: { fontFamily: 'Fredoka_600SemiBold', fontSize: 17 },
-  actionPanel: { paddingVertical: 1, borderRadius: 0, borderWidth: 0, gap: 10 },
+  actionPanel: { marginTop: 7, paddingVertical: 1, borderRadius: 0, borderWidth: 0, gap: 10 },
   actionTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   controlDock: { width: '100%', minHeight: 94, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 2 },
   controlDockAiming: { width: '100%' },

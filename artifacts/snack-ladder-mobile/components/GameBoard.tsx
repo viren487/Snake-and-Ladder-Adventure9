@@ -199,13 +199,13 @@ function BambooReturnArt({ active, torchVisible, collecting }: { active: boolean
       <Defs>
         <SvgLinearGradient id="mobile-bamboo-stalk" x1="0" y1="0" x2="1" y2="0">
           <Stop offset="0" stopColor="#4d6b1f" />
-          <Stop offset=".3" stopColor="#a7bf4a" />
-          <Stop offset=".55" stopColor="#7d9a2e" />
+          <Stop offset={0.3} stopColor="#a7bf4a" />
+          <Stop offset={0.55} stopColor="#7d9a2e" />
           <Stop offset="1" stopColor="#3a5217" />
         </SvgLinearGradient>
         <SvgLinearGradient id="mobile-bamboo-node" x1="0" y1="0" x2="1" y2="0">
           <Stop offset="0" stopColor="#5c4a1c" />
-          <Stop offset=".4" stopColor="#c2a64f" />
+          <Stop offset={0.4} stopColor="#c2a64f" />
           <Stop offset="1" stopColor="#4a3a14" />
         </SvgLinearGradient>
         <SvgLinearGradient id="mobile-bamboo-leaf" x1="0" y1="0" x2="1" y2="0">
@@ -214,7 +214,7 @@ function BambooReturnArt({ active, torchVisible, collecting }: { active: boolean
         </SvgLinearGradient>
         <SvgLinearGradient id="mobile-bamboo-glow" x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor="#fffbd0" stopOpacity=".94" />
-          <Stop offset=".5" stopColor="#ffdf62" stopOpacity=".58" />
+          <Stop offset={0.5} stopColor="#ffdf62" stopOpacity={0.58} />
           <Stop offset="1" stopColor="#ff8b24" stopOpacity="0" />
         </SvgLinearGradient>
       </Defs>
