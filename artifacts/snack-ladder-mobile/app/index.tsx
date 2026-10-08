@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AccessibilityInfo,
   ActivityIndicator,
+  Image,
   Keyboard,
   Platform,
   Pressable,
@@ -13,6 +14,15 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -75,6 +85,7 @@ type SavedRound = { id: string; mode: LocalMode; updatedAt: string; game: GameSt
 const ROUNDS_KEY = 'snack-ladder-mobile:saved-rounds:v1';
 const ONLINE_SEAT_KEY = 'snack-ladder-mobile:online-seat:v1';
 const PROFILE_KEY = 'snack-ladder-mobile:profile:v1';
+const LAUNCH_MIN_VISIBLE_MS = 900;
 const PLAYER_COLORS = ['blue', 'coral', 'green', 'purple'] as const;
 const MOVEMENT_STEP_DELAY_MS = 240;
 const SPECIAL_MOVE_DURATION_MS = { ladder: 2280, snake: 2080, web: 1500, knife: 1300 } as const;
@@ -284,6 +295,134 @@ function Field({
   );
 }
 
+function LaunchProgress({
+  width,
+  color,
+  trackColor,
+  reduceMotion,
+}: {
+  width: number;
+  color: string;
+  trackColor: string;
+  reduceMotion: boolean;
+}) {
+  const progress = useSharedValue(0);
+  const beamWidth = Math.max(58, Math.min(110, width * 0.34));
+
+  useEffect(() => {
+    if (reduceMotion) {
+      progress.value = 0.5;
+      return;
+    }
+    progress.value = withRepeat(
+      withTiming(1, { duration: 1050, easing: Easing.linear }),
+      -1,
+      false,
+    );
+    return () => cancelAnimation(progress);
+  }, [progress, reduceMotion]);
+
+  const beamStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: interpolate(progress.value, [0, 1], [-beamWidth, width]) }],
+  }), [beamWidth, width]);
+
+  return (
+    <View
+      accessibilityRole="progressbar"
+      accessibilityLabel="Preparing the game"
+      style={[styles.launchProgressTrack, { width, backgroundColor: trackColor }]}
+    >
+      <Animated.View style={[styles.launchProgressBeam, { width: beamWidth, backgroundColor: color }, beamStyle]} />
+    </View>
+  );
+}
+
+function MobileLaunchScreen({
+  colors,
+  width,
+  safeTop,
+  safeBottom,
+  reduceMotion,
+}: {
+  colors: ReturnType<typeof useColors>;
+  width: number;
+  safeTop: number;
+  safeBottom: number;
+  reduceMotion: boolean;
+}) {
+  const contentWidth = Math.max(220, Math.min(340, width - 48));
+  const logoSize = Math.min(176, Math.max(136, width * 0.45));
+
+  return (
+    <LinearGradient
+      colors={[colors.background, colors.card, colors.background]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.launchScreen}
+      testID="launch-loading"
+    >
+      <View pointerEvents="none" style={[styles.launchAura, styles.launchAuraTop, { backgroundColor: colors.accent }]} />
+      <View pointerEvents="none" style={[styles.launchAura, styles.launchAuraBottom, { backgroundColor: colors.primary }]} />
+      <View style={[styles.launchContent, { paddingTop: Math.max(28, safeTop), paddingBottom: Math.max(28, safeBottom) }]}>
+        <View style={[styles.launchEyebrow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+          <MaterialCommunityIcons name="star-four-points" size={12} color={colors.primary} />
+          <Text style={[styles.launchEyebrowText, { color: colors.mutedForeground }]}>GETTING READY</Text>
+        </View>
+
+        <View
+          style={[
+            styles.launchLogoFrame,
+            {
+              width: logoSize + 20,
+              height: logoSize + 20,
+              backgroundColor: colors.secondary,
+              borderColor: colors.primary,
+            },
+          ]}
+        >
+          <Image
+            source={require('../assets/images/icon.png')}
+            accessibilityLabel="Panda, snake and ladder game logo"
+            resizeMode="contain"
+            style={{ width: logoSize, height: logoSize, borderRadius: 28 }}
+          />
+        </View>
+
+        <View style={styles.launchBrandCopy}>
+          <Text style={[styles.launchTitle, { color: colors.foreground }]}>Snakes &amp; Ladders</Text>
+          <Text style={[styles.launchSubtitle, { color: colors.mutedForeground }]}>A TINY QUEST FOR TWO</Text>
+        </View>
+
+        <View style={styles.launchRoute}>
+          <View style={[styles.launchRouteTile, { backgroundColor: colors.boardBlue, borderColor: colors.boardBlueHighlight }]}>
+            <Text style={[styles.launchRouteNumber, { color: colors.boardInk }]}>98</Text>
+          </View>
+          <Feather name="chevron-right" size={15} color={colors.mutedForeground} />
+          <View style={[styles.launchRouteTile, { backgroundColor: colors.boardCream, borderColor: colors.boardCreamHighlight }]}>
+            <Text style={[styles.launchRouteNumber, { color: colors.boardInk }]}>99</Text>
+          </View>
+          <Feather name="chevron-right" size={15} color={colors.mutedForeground} />
+          <View style={[styles.launchRouteTile, { backgroundColor: colors.accent, borderColor: colors.boardGreenHighlight }]}>
+            <MaterialCommunityIcons name="crown" size={17} color={colors.accentForeground} />
+            <Text style={[styles.launchRouteNumber, { color: colors.accentForeground }]}>100</Text>
+          </View>
+        </View>
+
+        <View style={styles.launchStatus}>
+          <Text style={[styles.launchStatusTitle, { color: colors.foreground }]}>Preparing your board</Text>
+          <LaunchProgress
+            width={contentWidth}
+            color={colors.primary}
+            trackColor={colors.secondary}
+            reduceMotion={reduceMotion}
+          />
+          <Text style={[styles.launchStatusCaption, { color: colors.mutedForeground }]}>Loading your game data</Text>
+        </View>
+      </View>
+    </LinearGradient>
+  );
+}
+
 export default function IndexScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -302,6 +441,7 @@ export default function IndexScreen() {
   const [roomCode, setRoomCode] = useState('');
   const [savedRounds, setSavedRounds] = useState<SavedRound[]>([]);
   const [storageReady, setStorageReady] = useState(false);
+  const [launchMinimumElapsed, setLaunchMinimumElapsed] = useState(false);
   const [saveBlocked, setSaveBlocked] = useState(false);
   const [storageError, setStorageError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -521,6 +661,7 @@ export default function IndexScreen() {
 
   useEffect(() => {
     isMounted.current = true;
+    const launchTimer = setTimeout(() => setLaunchMinimumElapsed(true), LAUNCH_MIN_VISIBLE_MS);
     void (async () => {
       try {
         const [rawRounds, storedName] = await Promise.all([
@@ -555,6 +696,7 @@ export default function IndexScreen() {
       }
     })();
     return () => {
+      clearTimeout(launchTimer);
       isMounted.current = false;
       if (botTimer.current) clearTimeout(botTimer.current);
     };
@@ -1194,15 +1336,15 @@ export default function IndexScreen() {
     </View>
   );
 
-  if (!storageReady) {
+  if (!storageReady || !launchMinimumElapsed || online.loadingSession) {
     return (
-      <View style={[styles.screen, styles.launchLoading, { backgroundColor: colors.background }]} testID="launch-loading">
-        <View style={[styles.brandMark, { backgroundColor: colors.secondary, borderColor: colors.primary }]}>
-          <MaterialCommunityIcons name="crown" size={22} color={colors.primary} />
-        </View>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.note, { color: colors.mutedForeground }]}>Opening your game board…</Text>
-      </View>
+      <MobileLaunchScreen
+        colors={colors}
+        width={windowWidth}
+        safeTop={topInset}
+        safeBottom={bottomInset}
+        reduceMotion={reduceMotion}
+      />
     );
   }
 
@@ -2018,7 +2160,25 @@ export default function IndexScreen() {
 
  const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#171b2c' },
-  launchLoading: { alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 20 },
+  launchScreen: { flex: 1 },
+  launchAura: { position: 'absolute', width: 240, height: 240, borderRadius: 120, opacity: 0.1 },
+  launchAuraTop: { top: -110, right: -112 },
+  launchAuraBottom: { bottom: -130, left: -118 },
+  launchContent: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, gap: 20 },
+  launchEyebrow: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99, borderWidth: 1 },
+  launchEyebrowText: { fontFamily: 'monospace', fontSize: 8, letterSpacing: 1.25 },
+  launchLogoFrame: { alignItems: 'center', justifyContent: 'center', padding: 8, borderRadius: 36, borderWidth: 1, shadowColor: '#080b14', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.35, shadowRadius: 18, elevation: 6 },
+  launchBrandCopy: { alignItems: 'center', gap: 3 },
+  launchTitle: { fontFamily: 'Fredoka_600SemiBold', fontSize: 30, lineHeight: 36, textAlign: 'center' },
+  launchSubtitle: { fontFamily: 'monospace', fontSize: 9, letterSpacing: 1.6 },
+  launchRoute: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 2 },
+  launchRouteTile: { minWidth: 43, height: 34, paddingHorizontal: 8, borderRadius: 11, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },
+  launchRouteNumber: { fontFamily: 'monospace', fontSize: 10, fontWeight: 'bold' as const },
+  launchStatus: { alignItems: 'center', gap: 9, marginTop: 5 },
+  launchStatusTitle: { fontFamily: 'Fredoka_600SemiBold', fontSize: 18 },
+  launchStatusCaption: { fontFamily: 'Nunito_600SemiBold', fontSize: 11 },
+  launchProgressTrack: { height: 6, borderRadius: 99, overflow: 'hidden' },
+  launchProgressBeam: { position: 'absolute', top: 0, bottom: 0, left: 0, borderRadius: 99 },
   homeContent: { paddingHorizontal: 12, gap: 14 },
   gameContent: { paddingHorizontal: 12, gap: 8 },
   homeHeader: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 2 },
