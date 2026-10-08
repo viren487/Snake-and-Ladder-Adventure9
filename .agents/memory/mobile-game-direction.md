@@ -25,11 +25,11 @@ The user explicitly chose a board-first launch on October 8, 2026. Wait for loca
 
 ## Mobile launch screen
 
-The launch loading screen is mobile-only and temporary; the game board remains the first destination after startup.
+The mobile-only startup loader uses the user's supplied loading artwork and remains visible for at least three seconds before the saved-round board.
 
-**Why:** On October 9, 2026, the user asked for a loading page when opening the mobile app and explicitly said not to add it to the website. This is compatible with the earlier board-first choice because the loader is only a brief startup transition.
+**Why:** On October 9, 2026, the user asked to use supplied splash artwork and show it for three seconds, while also keeping the loading page out of the website. This is compatible with the earlier board-first choice because the loader is only a startup transition.
 
-**How to apply:** Keep the loader out of the web artifact and do not replace the resumed game board with a persistent intro or setup screen.
+**How to apply:** Keep the loader mobile-only for at least three seconds, then resume the latest saved round. Do not replace the board with a persistent intro or setup screen.
 
 ## React Native SVG web compatibility
 
