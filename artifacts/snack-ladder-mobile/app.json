@@ -8,8 +8,8 @@
     "scheme": "snack-ladder-mobile",
     "userInterfaceStyle": "dark",
     "splash": {
-      "image": "./assets/images/icon.png",
-      "resizeMode": "contain",
+      "image": "./assets/images/loading-screen.png",
+      "resizeMode": "cover",
       "backgroundColor": "#171b2c"
     },
     "ios": {

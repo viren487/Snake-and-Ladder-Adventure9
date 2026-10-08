@@ -25,11 +25,11 @@ The user explicitly chose a board-first launch on October 8, 2026. Wait for loca
 
 ## Mobile launch screen
 
-The mobile-only startup loader uses the user's supplied loading artwork, and its yellow bar animates from empty to full over three seconds before the saved-round board.
+The mobile-only startup uses the user's supplied artwork as its sole splash screen. The yellow bar follows saved-game and online-session readiness, and reaches full only when the board is ready.
 
-**Why:** On October 9, 2026, the user asked to use supplied splash artwork, show it for three seconds, and animate the yellow bar from start to finish, while keeping the loading page out of the website. This is compatible with the earlier board-first choice because the loader is only a startup transition.
+**Why:** On October 9, 2026, the user clarified that the provided splash should replace separate loading screens and that its yellow bar should follow real game/project startup rather than a separate fixed timer.
 
-**How to apply:** Keep the loader mobile-only, animate its progress bar from 0% to 100% over three seconds, then resume the latest saved round. Do not replace the board with a persistent intro or setup screen.
+**How to apply:** Keep native and React startup visually on the same supplied artwork. Advance the bar as storage/session stages actually finish; show 100% and reveal the saved board only when startup is ready. Do not add a second loading indicator or fixed-duration wait.
 
 ## React Native SVG web compatibility
 
