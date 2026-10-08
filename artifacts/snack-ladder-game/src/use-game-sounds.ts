@@ -88,7 +88,7 @@ export function useGameSounds() {
 
   const playPickups = useCallback((before: PickupState, after: PickupState) => {
     if (after.bullets > before.bullets) play("bullet");
-    if (before.crownKeyRoom === null && after.crownKeyRoom !== null) play("happy");
+    if (before.crownKeyRoom === null && after.crownKeyRoom !== null) play("key");
   }, [play]);
 
   const toggleMuted = useCallback(() => {

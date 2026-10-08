@@ -7,15 +7,29 @@ The user explicitly resumed mobile work on October 8, 2026 and asked for its gam
 
 **Why:** The web and mobile clients have separate UI implementations, so visual changes do not carry across automatically. The user noticed the difference and asked for parity.
 
-**How to apply:** For game UI requests, keep the same brand, palette, board treatment and screen hierarchy across clients while retaining mobile touch sizing and native interactions. Do not alter browser gameplay or saved-game behavior unless requested. Do not build an APK unless explicitly asked.
+**How to apply:** Treat the website as the current feature baseline and keep its game UI, actions, feedback and animations aligned on native mobile, while retaining touch sizing and mobile-only saved rounds. Keep both clients aligned when a requested feature changes shared behavior. Do not build an APK unless explicitly asked.
 
 ## Mobile testing
 
-Replit's built-in Android Emulator is available in the desktop Project Editor, not inside the Replit mobile app. The desktop emulator can preview an Expo app without Expo Go on a personal phone; testing directly on a phone uses Expo Go. A mobile website route is not a substitute for the native Expo app. The expected launch flow is loading, player-name setup, play-mode selection, then the playable game. An installable Android package is separate work and should only be built when explicitly requested.
+Replit's built-in Android Emulator is available in the desktop Project Editor, not inside the Replit mobile app. The desktop emulator can preview an Expo app without Expo Go on a personal phone; testing directly on a phone uses Expo Go. A mobile website route is not a substitute for the native Expo app. An installable Android package is separate work and should only be built when explicitly requested.
 
 **Why:** The user expects a functioning native preview rather than a mobile web route or an automatically generated APK. The desktop editor's emulator is not available inside the Replit mobile app.
 
-**How to apply:** Use the desktop Project Editor's Android Emulator for device testing without a personal phone; use Expo Go for personal-phone testing. Do not tell the user to open the desktop emulator inside Replit mobile.
+**How to apply:** Use the desktop Project Editor's Android Emulator for device testing without a personal phone; use Expo Go for personal-phone testing. Keep the explicitly chosen board-first launch and preserve all saved rounds. Do not tell the user to open the desktop emulator inside Replit mobile.
+
+The user explicitly chose a board-first launch on October 8, 2026. Wait for local storage, then resume the most recently updated local round; if none exists, create a fresh two-player Pass & Play board. Put player, mode, and room setup behind “New Game,” and keep all other saved rounds intact.
+
+**Why:** The user said the mobile app should open like the website rather than showing a separate setup screen first.
+
+**How to apply:** Preserve this launch choice in future mobile navigation changes. Do not clear or replace saved rounds while selecting the latest round.
+
+## React Native SVG web compatibility
+
+In this Expo web preview, `react-native-svg` forwards `accessible={false}` and `originX`/`originY` as invalid DOM attributes. For decorative SVGs, use `aria-hidden={true}`; for centered rotations, use the SVG `transform` string rather than legacy rotation/origin props.
+
+**Why:** Those props triggered visible React error notices over the mobile game preview.
+
+**How to apply:** When adding SVG icon art shared between native and web, verify the Expo web preview and avoid props that become invalid HTML/SVG attributes.
 
 ## Sound scope
 
@@ -47,7 +61,7 @@ Key and crown progression follows the crown quest described in crown-quest.md; d
 
 **Why:** The user reiterated the exact-room requirement with room 6: stopping on 6 rewards a bullet; crossing 6 and continuing does not. Firing must remain at gun rooms, with single-target and both-target aiming restricted by available bullets.
 
-**How to apply:** Apply gameplay changes to the browser game only. Preserve inventory, firing, per-player countdowns, quest progress and turn messages.
+**How to apply:** Apply gameplay behavior and feedback changes to both web and mobile. Preserve inventory, firing, per-player countdowns, quest progress, turn messages and the user's saved rounds.
 
 ## Saved-round compatibility
 
@@ -63,7 +77,7 @@ Do not rely on a timed smooth scroll to make short gameplay effects visible. Pos
 
 **Why:** Browser checks found that smooth scrolling could leave the upper-board snake targets offscreen for the entire short firing animation, despite correctly resolving the shot. Direct instant document scrolling made the target area visible.
 
-**How to apply:** When controls and action areas are separated on narrow screens, establish visibility before playing a short animation and restore the controls afterward.
+**How to apply:** On both clients, establish visibility before playing a short animation when controls and action areas are separated on narrow screens, then restore the controls afterward.
 
 ## Snake and ladder movement
 
@@ -71,4 +85,4 @@ Snake slides and ladder climbs should be visibly slower and playful, with gentle
 
 **Why:** The user said the snake-bite and ladder-climb effects were too fast and requested a slower, cute animation.
 
-**How to apply:** Keep visual motion and turn-completion timing synchronized in the browser game, while respecting reduced-motion settings.
+**How to apply:** Keep visual motion and turn-completion timing synchronized in both clients, while respecting reduced-motion settings.

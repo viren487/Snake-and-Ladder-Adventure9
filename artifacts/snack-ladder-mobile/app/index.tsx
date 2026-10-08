@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Keyboard,
   Platform,
@@ -12,7 +13,6 @@ import {
   View,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -44,14 +44,16 @@ import {
   isPendingAdmission,
   isRoomSession,
   useOnlineRoom,
+  sendRoomCommunication,
   type OnlineAction,
   type RoomStorage,
 } from '@workspace/api-client-react';
 import type { RoomSnapshot } from '@workspace/game-core/online';
 import { getMrBotAction, type MrBotAction } from '@/lib/mr-bot';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
-import { GameBoard, type BoardBlast } from '@/components/GameBoard';
+import { GameBoard, type BoardBlast, type BoardMotion, type BoardPickupNotice, type BoardShot } from '@/components/GameBoard';
 import { PowerGlyph } from '@/components/PowerGlyph';
+import { PowerInventoryRow } from '@/components/PowerInventoryRow';
 import { useColors } from '@/hooks/useColors';
 import { useGameSounds } from '@/lib/game-sounds';
 
@@ -72,6 +74,10 @@ const ROUNDS_KEY = 'snack-ladder-mobile:saved-rounds:v1';
 const ONLINE_SEAT_KEY = 'snack-ladder-mobile:online-seat:v1';
 const PROFILE_KEY = 'snack-ladder-mobile:profile:v1';
 const PLAYER_COLORS = ['blue', 'coral', 'green', 'purple'] as const;
+const MOVEMENT_STEP_DELAY_MS = 240;
+const SPECIAL_MOVE_DURATION_MS = { ladder: 2280, snake: 2080, web: 1500, knife: 1300 } as const;
+
+type PowerSlot = 'bomb' | 'antiVenom' | 'defuser' | 'webShooter' | 'knife' | 'extraDice';
 
 function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -279,12 +285,12 @@ export default function IndexScreen() {
   const insets = useSafeAreaInsets();
   const sounds = useGameSounds();
   const muted = sounds.muted;
-  const [screen, setScreen] = useState<Screen>('home');
+  const [screen, setScreen] = useState<Screen>('game');
   const [localMode, setLocalMode] = useState<LocalMode>('pass');
   const [localGame, setLocalGame] = useState<GameState | null>(null);
   const [localRoundId, setLocalRoundId] = useState<string | null>(null);
-  const [playerName, setPlayerName] = useState('Panda Player');
-  const [friendName, setFriendName] = useState('Friend');
+  const [playerName, setPlayerName] = useState('Player 1');
+  const [friendName, setFriendName] = useState('Player 2');
   const [localPlayerCount, setLocalPlayerCount] = useState(2);
   const [roomPlayerCount, setRoomPlayerCount] = useState(2);
   const [roomCode, setRoomCode] = useState('');
@@ -298,11 +304,27 @@ export default function IndexScreen() {
   const [selectedTargets, setSelectedTargets] = useState<ShootableSnakeSquare[]>([]);
   const [fireStage, setFireStage] = useState<'decision' | 'targets'>('decision');
   const [bombBlast, setBombBlast] = useState<BoardBlast | null>(null);
+  const [walking, setWalking] = useState<BoardMotion | null>(null);
+  const [shot, setShot] = useState<BoardShot | null>(null);
+  const [firing, setFiring] = useState(false);
+  const [pickupNotice, setPickupNotice] = useState<BoardPickupNotice | null>(null);
+  const [remoteDisplayGame, setRemoteDisplayGame] = useState<GameState | null>(null);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const [activePower, setActivePower] = useState<PowerSlot | null>(null);
+  const [onlinePanelOpen, setOnlinePanelOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatDraft, setChatDraft] = useState('');
+  const [chatSending, setChatSending] = useState(false);
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const botTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMounted = useRef(true);
   const previousOnlineGame = useRef<GameState | null>(null);
   const previousBlastGame = useRef<GameState | null>(null);
+  const onlineAnimationEpoch = useRef(0);
+  const localAnimationEpoch = useRef(0);
+  const walkingSequence = useRef(0);
+  const shotSequence = useRef(0);
+  const pickupSequence = useRef(0);
   const blastSequence = useRef(0);
   const gameScrollRef = useRef<ScrollView | null>(null);
 
@@ -324,30 +346,163 @@ export default function IndexScreen() {
 
   const online = useOnlineRoom({
     storage: roomStorage,
-    onUpdate: (room: RoomSnapshot, animate: boolean) => {
+    onUpdate: async (room: RoomSnapshot, animate: boolean) => {
       const previous = previousOnlineGame.current;
       previousOnlineGame.current = room.game;
-      if (!animate || !room.event || !previous) return;
-      const bombBlast = (room.event.kind === 'detonate' || room.event.effect === 'boom') &&
-        /(detonated the bomb|hit the boom)/i.test(room.game.message);
-      for (const player of room.game.players) {
-        const before = previous.players.find((item) => item.id === player.id);
-        if (!before) continue;
-        sounds.playPickups(before, player);
-        if (before.position !== player.position && !bombBlast) sounds.play('step');
+      if (!animate || !room.event || !previous) {
+        onlineAnimationEpoch.current += 1;
+        setRemoteDisplayGame(null);
+        setDiceFace(room.game.lastRoll);
+        return;
       }
-      if (room.event.kind === 'roll') sounds.play('dice');
-      if (room.event.effect === 'snake' || room.event.effect === 'ladder') sounds.play(room.event.effect);
-      if (room.event.effect === 'torch') sounds.play('happy');
-      if (room.event.kind === 'shoot') {
-        sounds.play('fire');
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+      const epoch = ++onlineAnimationEpoch.current;
+      const event = room.event;
+      const wait = (duration: number) => new Promise<void>((resolve) => setTimeout(resolve, duration));
+      const stillCurrent = () => isMounted.current && onlineAnimationEpoch.current === epoch;
+      const setMotion = (motion: Omit<BoardMotion, 'id'>) => {
+        setWalking({ ...motion, id: ++walkingSequence.current });
+      };
+      setRemoteDisplayGame(previous);
+      setRolling(true);
+      setSelectedTargets([]);
+      try {
+        if (event.kind === 'roll') {
+          sounds.play('dice');
+          for (let tick = 0; tick < (reduceMotion ? 1 : 7); tick += 1) {
+            setDiceFace(1 + Math.floor(Math.random() * 6));
+            await wait(reduceMotion ? 40 : 85);
+            if (!stillCurrent()) return;
+          }
+          setDiceFace(event.roll);
+          for (const square of event.path) {
+            setMotion({ playerId: event.playerId, position: square, effect: 'step' });
+            sounds.play('step');
+            await wait(reduceMotion ? 35 : MOVEMENT_STEP_DELAY_MS);
+            if (!stillCurrent()) return;
+          }
+        }
+
+        if (event.kind === 'shoot') {
+          sounds.play('fire');
+          setFiring(true);
+          setShot({ id: ++shotSequence.current, from: event.from, targets: event.targets as ShootableSnakeSquare[] });
+          await wait(reduceMotion ? 150 : 950);
+          if (!stillCurrent()) return;
+        }
+
+        const moved = room.game.players.find((player) => player.id === event.playerId);
+        const oldPlayer = previous.players.find((player) => player.id === event.playerId);
+        if (moved && oldPlayer && (event.effect === 'web' || event.effect === 'knife')) {
+          const sourcePosition = event.sourcePosition
+            ?? (event.sourcePlayerId ? room.game.players.find((player) => player.id === event.sourcePlayerId)?.position : undefined)
+            ?? event.from;
+          setMotion({
+            playerId: moved.id,
+            position: moved.position,
+            effect: event.effect,
+            sourcePosition,
+          });
+          await wait(reduceMotion ? 45 : event.effect === 'web' ? SPECIAL_MOVE_DURATION_MS.web : SPECIAL_MOVE_DURATION_MS.knife);
+          if (!stillCurrent()) return;
+        } else if (moved && (event.effect === 'torch' || event.effect === 'return')) {
+          setMotion({
+            playerId: moved.id,
+            position: 100,
+            effect: event.effect,
+            carriedItem: moved.crownKeyRoom !== null ? 'key' : 'torch',
+          });
+          await wait(reduceMotion ? 150 : 1100);
+          if (!stillCurrent()) return;
+          setMotion({
+            playerId: moved.id,
+            position: 100,
+            effect: 'bamboo',
+            carriedItem: moved.crownKeyRoom !== null ? 'key' : 'torch',
+            sourcePosition: 100,
+          });
+          await wait(reduceMotion ? 45 : 200);
+          if (event.effect === 'torch') {
+            sounds.play('happy');
+            setPickupNotice({ id: ++pickupSequence.current, kind: 'torch', playerName: moved.name });
+          }
+          setMotion({
+            playerId: moved.id,
+            position: 0,
+            effect: 'bamboo',
+            carriedItem: moved.crownKeyRoom !== null ? 'key' : 'torch',
+            sourcePosition: 100,
+          });
+          await wait(reduceMotion ? 45 : 2680);
+          if (!stillCurrent()) return;
+          setMotion({ playerId: moved.id, position: 0, effect: 'step' });
+          await wait(reduceMotion ? 45 : 300);
+        } else if (moved && (event.effect === 'ladder' || event.effect === 'snake')) {
+          sounds.play(event.effect);
+          setMotion({ playerId: moved.id, position: moved.position, effect: event.effect });
+          await wait(reduceMotion ? 45 : SPECIAL_MOVE_DURATION_MS[event.effect]);
+          if (!stillCurrent()) return;
+        }
+
+        const bombMessage = /(detonated the bomb|hit the boom)/i.test(room.game.message);
+        if (bombMessage && (event.kind === 'detonate' || event.effect === 'boom')) {
+          const victims = previous.players.flatMap((player) => {
+            const after = room.game.players.find((item) => item.id === player.id);
+            return after && player.position > 0 && after.position === 0
+              ? [{ playerId: player.id, fromSquare: player.position }]
+              : [];
+          });
+          if (victims.length > 0) {
+            const location = room.game.message.match(/(?:house|square)\s+(\d+)/i);
+            setBombBlast({
+              id: ++blastSequence.current,
+              sourceSquare: location ? Number(location[1]) : victims[0].fromSquare,
+              victims,
+            });
+            sounds.play('bomb');
+            await wait(reduceMotion ? 150 : 2430);
+            if (!stillCurrent()) return;
+            previousBlastGame.current = room.game;
+          }
+        }
+
+        for (const player of room.game.players) {
+          const before = previous.players.find((item) => item.id === player.id);
+          if (!before) continue;
+          sounds.playPickups(before, player);
+          if (before.hasTorch !== player.hasTorch && player.hasTorch) {
+            setPickupNotice({ id: ++pickupSequence.current, kind: 'torch', playerName: player.name });
+          }
+          if (before.crownKeyRoom === null && player.crownKeyRoom !== null) {
+            setPickupNotice({
+              id: ++pickupSequence.current,
+              kind: 'key',
+              playerName: player.name,
+              room: player.crownKeyRoom,
+            });
+          }
+        }
+        setDiceFace(room.game.lastRoll);
+      } finally {
+        if (stillCurrent()) {
+          setRemoteDisplayGame(null);
+          setWalking(null);
+          setShot(null);
+          setFiring(false);
+          setRolling(false);
+        }
       }
     },
     onExit: () => {
+      onlineAnimationEpoch.current += 1;
       previousOnlineGame.current = null;
-      setScreen('home');
+      setRemoteDisplayGame(null);
+      setWalking(null);
+      setShot(null);
+      setFiring(false);
+      setRolling(false);
+      setScreen('game');
       setSelectedTargets([]);
+      setChatOpen(false);
       setActionError(null);
     },
   }, React);
@@ -362,10 +517,27 @@ export default function IndexScreen() {
         ]);
         const rounds = parseRounds(rawRounds);
         setSavedRounds(rounds);
-        if (storedName?.trim()) setPlayerName(storedName.trim().slice(0, 24));
+        const normalizedName = storedName?.trim().slice(0, 24) || '';
+        if (normalizedName) setPlayerName(normalizedName);
+        const latestRound = [...rounds].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+        if (latestRound) {
+          setLocalMode(latestRound.mode);
+          setLocalGame(latestRound.game);
+          setLocalRoundId(latestRound.id);
+          setDiceFace(latestRound.game.lastRoll);
+        } else {
+          setLocalMode('pass');
+          setLocalGame(makeLocalGame('pass', 2, normalizedName || 'Player 1', 'Player 2'));
+          setLocalRoundId(newRoundId());
+          setDiceFace(null);
+        }
       } catch (reason) {
         setSaveBlocked(true);
         setStorageError(reason instanceof Error ? reason.message : 'Saved data could not be read. It has not been replaced.');
+        setLocalMode('pass');
+        setLocalGame(makeLocalGame('pass', 2, 'Player 1', 'Player 2'));
+        setLocalRoundId(newRoundId());
+        setDiceFace(null);
       } finally {
         setStorageReady(true);
       }
@@ -375,6 +547,24 @@ export default function IndexScreen() {
       if (botTimer.current) clearTimeout(botTimer.current);
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (active) setReduceMotion(enabled);
+    }).catch(() => undefined);
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!pickupNotice) return;
+    const timeout = setTimeout(() => setPickupNotice(null), 3200);
+    return () => clearTimeout(timeout);
+  }, [pickupNotice?.id]);
 
   useEffect(() => {
     if (!storageReady) return;
@@ -421,7 +611,7 @@ export default function IndexScreen() {
   }, [localGame?.winnerId, online.room?.game.winnerId, sounds.setCelebrating]);
 
   const showGame = screen === 'game' || (!!online.session && !!online.room);
-  const game = online.session ? online.room?.game ?? null : localGame;
+  const game = online.session ? remoteDisplayGame ?? online.room?.game ?? null : localGame;
   const currentPlayer = game?.players[game.currentPlayerIndex] ?? null;
   useEffect(() => {
     if (!game) {
@@ -465,30 +655,146 @@ export default function IndexScreen() {
   const actionDisabled = rolling || online.busy || !!online.pendingAdmission ||
     (!!online.session && (!online.canAct || !online.connected)) ||
     (!!botTurn && !online.session);
-  const topInset = Platform.OS === 'web' ? 67 : insets.top;
-  const bottomInset = Platform.OS === 'web' ? 34 : insets.bottom;
+  const topInset = Platform.OS === 'web' ? 8 : insets.top;
+  const bottomInset = Platform.OS === 'web' ? 0 : insets.bottom;
 
   const saveLocalGame = useCallback((next: GameState) => {
     setLocalGame(next);
     setActionError(null);
     if (game && currentPlayer) {
       const nextPlayer = next.players.find((item) => item.id === currentPlayer.id);
-      if (nextPlayer) {
-        sounds.playPickups(currentPlayer, nextPlayer);
-        const isBlast = /(detonated the bomb|hit the boom)/i.test(next.message);
-        if (nextPlayer.position !== currentPlayer.position && !isBlast) {
-          sounds.play('step');
-          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+      if (nextPlayer) sounds.playPickups(currentPlayer, nextPlayer);
+    }
+  }, [currentPlayer, game, sounds]);
+
+  const animateLocalResolution = useCallback(async (
+    before: GameState,
+    resolution: TurnResolution,
+    animateDice = false,
+  ) => {
+    const epoch = ++localAnimationEpoch.current;
+    const wait = (duration: number) => new Promise<void>((resolve) => setTimeout(resolve, duration));
+    const stillCurrent = () => isMounted.current && localAnimationEpoch.current === epoch;
+    const setMotion = (motion: Omit<BoardMotion, 'id'>) => {
+      setWalking({ ...motion, id: ++walkingSequence.current });
+    };
+    const actor = before.players[before.currentPlayerIndex];
+    const after = resolution.state;
+    setRolling(true);
+    try {
+      if (animateDice) {
+        sounds.play('dice');
+        for (let tick = 0; tick < (reduceMotion ? 1 : 7); tick += 1) {
+          setDiceFace(1 + Math.floor(Math.random() * 6));
+          await wait(reduceMotion ? 40 : 85);
+          if (!stillCurrent()) return;
         }
-        if (nextPlayer.position < currentPlayer.position && /snake|slid/i.test(next.message)) sounds.play('snake');
-        if (nextPlayer.position > currentPlayer.position && /climbed/i.test(next.message)) sounds.play('ladder');
+        setDiceFace(after.lastRoll);
+      }
+      for (const square of resolution.path) {
+        setMotion({ playerId: actor.id, position: square, effect: 'step' });
+        sounds.play('step');
+        await wait(reduceMotion ? 35 : MOVEMENT_STEP_DELAY_MS);
+        if (!stillCurrent()) return;
+      }
+
+      if (resolution.effect === 'web' || resolution.effect === 'knife') {
+        const moved = after.players.find((player) => {
+          const old = before.players.find((item) => item.id === player.id);
+          return old && old.id !== actor.id && old.position !== player.position;
+        });
+        const old = moved && before.players.find((player) => player.id === moved.id);
+        if (moved && old) {
+          setMotion({
+            playerId: moved.id,
+            position: moved.position,
+            sourcePosition: old.position,
+            effect: resolution.effect,
+          });
+          await wait(reduceMotion ? 45 : SPECIAL_MOVE_DURATION_MS[resolution.effect]);
+          if (!stillCurrent()) return;
+        }
+      } else if (resolution.effect === 'torch' || resolution.effect === 'return') {
+        const moved = after.players.find((player) => player.id === actor.id);
+        if (moved) {
+          const carriedItem = moved.crownKeyRoom !== null ? 'key' : 'torch';
+          setMotion({ playerId: moved.id, position: 100, effect: resolution.effect, carriedItem });
+          await wait(reduceMotion ? 150 : 1100);
+          if (!stillCurrent()) return;
+          setMotion({ playerId: moved.id, position: 100, effect: 'bamboo', sourcePosition: 100, carriedItem });
+          await wait(reduceMotion ? 45 : 200);
+          if (resolution.effect === 'torch') {
+            sounds.play('happy');
+            setPickupNotice({ id: ++pickupSequence.current, kind: 'torch', playerName: moved.name });
+          }
+          setMotion({ playerId: moved.id, position: 0, effect: 'bamboo', sourcePosition: 100, carriedItem });
+          await wait(reduceMotion ? 45 : 2600);
+          if (!stillCurrent()) return;
+          setMotion({ playerId: moved.id, position: 0, effect: 'step' });
+          await wait(reduceMotion ? 45 : 300);
+        }
+      } else if (resolution.effect === 'snake' || resolution.effect === 'ladder') {
+        const moved = after.players.find((player) => player.id === actor.id);
+        if (moved) {
+          sounds.play(resolution.effect);
+          setMotion({ playerId: moved.id, position: moved.position, effect: resolution.effect });
+          await wait(reduceMotion ? 45 : SPECIAL_MOVE_DURATION_MS[resolution.effect]);
+          if (!stillCurrent()) return;
+        }
+      }
+
+      const oldActor = before.players.find((player) => player.id === actor.id);
+      const newActor = after.players.find((player) => player.id === actor.id);
+      if (oldActor && newActor && oldActor.crownKeyRoom === null && newActor.crownKeyRoom !== null) {
+        setPickupNotice({
+          id: ++pickupSequence.current,
+          kind: 'key',
+          playerName: newActor.name,
+          room: newActor.crownKeyRoom,
+        });
+      }
+      if (stillCurrent()) saveLocalGame(after);
+    } finally {
+      if (stillCurrent()) {
+        setWalking(null);
+        setRolling(false);
       }
     }
-    if (next.message !== game?.message && /collected the torch/i.test(next.message)) sounds.play('happy');
-  }, [currentPlayer, game, sounds]);
+  }, [reduceMotion, saveLocalGame, sounds]);
+
+  const animateLocalShot = useCallback(async (before: GameState, targets: readonly ShootableSnakeSquare[]) => {
+    const epoch = ++localAnimationEpoch.current;
+    const wait = (duration: number) => new Promise<void>((resolve) => setTimeout(resolve, duration));
+    const stillCurrent = () => isMounted.current && localAnimationEpoch.current === epoch;
+    setRolling(true);
+    setSelectedTargets([]);
+    setFiring(true);
+    sounds.play('fire');
+    setShot({
+      id: ++shotSequence.current,
+      from: before.players[before.currentPlayerIndex].position,
+      targets,
+    });
+    try {
+      await wait(reduceMotion ? 150 : 950);
+      if (stillCurrent()) saveLocalGame(shootSnakes(before, [...targets]));
+    } finally {
+      if (stillCurrent()) {
+        setShot(null);
+        setFiring(false);
+        setRolling(false);
+      }
+    }
+  }, [reduceMotion, saveLocalGame, sounds]);
 
   const startLocalGame = (mode: LocalMode) => {
     const next = makeLocalGame(mode, localPlayerCount, playerName, friendName);
+    localAnimationEpoch.current += 1;
+    setWalking(null);
+    setShot(null);
+    setFiring(false);
+    setActivePower(null);
+    setPickupNotice(null);
     setLocalMode(mode);
     setLocalGame(next);
     setLocalRoundId(newRoundId());
@@ -502,6 +808,12 @@ export default function IndexScreen() {
     try {
       const safeGame = readGame(round.game);
       setLocalMode(round.mode);
+      localAnimationEpoch.current += 1;
+      setWalking(null);
+      setShot(null);
+      setFiring(false);
+      setActivePower(null);
+      setPickupNotice(null);
       setLocalGame(safeGame);
       setLocalRoundId(round.id);
       setDiceFace(safeGame.lastRoll);
@@ -549,23 +861,14 @@ export default function IndexScreen() {
       remoteAction({ type: 'roll' });
       return;
     }
-    setRolling(true);
-    sounds.play('dice');
     try {
-      for (let tick = 0; tick < 6; tick += 1) {
-        setDiceFace(1 + Math.floor(Math.random() * 6));
-        await new Promise((resolve) => setTimeout(resolve, 65));
-      }
       const roll = 1 + Math.floor(Math.random() * 6);
-      setDiceFace(roll);
       const resolution = resolveTurn(game, roll);
-      saveLocalGame(resolution.state);
+      await animateLocalResolution(game, resolution, true);
     } catch (reason) {
       setActionError(reason instanceof Error ? reason.message : 'The move could not be completed.');
-    } finally {
-      if (isMounted.current) setRolling(false);
     }
-  }, [currentPlayer, game, online.session, remoteAction, rolling, saveLocalGame, sounds]);
+  }, [animateLocalResolution, currentPlayer, game, online.session, remoteAction, rolling]);
 
   const chooseAimTargets = (choice: '98' | '99' | 'both') => {
     if (actionDisabled || !waitingForShot || !currentPlayer) return;
@@ -581,12 +884,9 @@ export default function IndexScreen() {
     if (online.session) {
       remoteAction({ type: 'shoot', targets: selectedTargets });
     } else {
-      try {
-        sounds.play('fire');
-        saveLocalGame(shootSnakes(game, selectedTargets));
-      } catch (reason) {
+      void animateLocalShot(game, selectedTargets).catch((reason) => {
         setActionError(reason instanceof Error ? reason.message : 'The shot could not be fired.');
-      }
+      });
     }
     setSelectedTargets([]);
   };
@@ -609,7 +909,13 @@ export default function IndexScreen() {
     try {
       const result = localRun(game);
       if ('state' in result) {
-        saveLocalGame(result.state);
+        if (result.effect) {
+          void animateLocalResolution(game, result).catch((reason) => {
+            setActionError(reason instanceof Error ? reason.message : 'That power animation could not be completed.');
+          });
+        } else {
+          saveLocalGame(result.state);
+        }
       } else {
         saveLocalGame(result);
       }
@@ -629,28 +935,26 @@ export default function IndexScreen() {
   const readyToPlant = !!game && !!currentPlayer && currentPlayer.powers.bomb > 0 &&
     currentPlayer.position > 0 && !game.bombs.some((bomb) => bomb.square === currentPlayer.position);
 
-  const performBotAction = useCallback((action: MrBotAction, state: GameState) => {
+  const performBotAction = useCallback(async (action: MrBotAction, state: GameState) => {
     try {
       switch (action.type) {
         case 'roll': {
           const roll = 1 + Math.floor(Math.random() * 6);
-          setDiceFace(roll);
-          sounds.play('dice');
           const result = resolveTurn(state, roll);
-          saveLocalGame(result.state);
+          await animateLocalResolution(state, result, true);
           break;
         }
         case 'choose': saveLocalGame(choosePower(state, action.power)); break;
         case 'defend': {
           const result = resolveDefense(state, action.use);
-          saveLocalGame(result.state);
+          await animateLocalResolution(state, result);
           break;
         }
-        case 'shoot': sounds.play('fire'); saveLocalGame(shootSnakes(state, action.targets)); break;
+        case 'shoot': await animateLocalShot(state, action.targets); break;
         case 'pass-shot': saveLocalGame(passFire(state)); break;
         case 'extra-dice': saveLocalGame(useExtraDice(state)); break;
-        case 'web': saveLocalGame(useWebShooter(state, action.targetPlayerId).state); break;
-        case 'knife': saveLocalGame(useKnife(state, action.targetPlayerId).state); break;
+        case 'web': await animateLocalResolution(state, useWebShooter(state, action.targetPlayerId)); break;
+        case 'knife': await animateLocalResolution(state, useKnife(state, action.targetPlayerId)); break;
         case 'plant': saveLocalGame(plantBomb(state, action.square)); break;
         case 'detonate': {
           const bomb = state.bombs.find((item) => item.id === action.bombId);
@@ -661,7 +965,7 @@ export default function IndexScreen() {
     } catch (reason) {
       setActionError(reason instanceof Error ? reason.message : 'Mr. Bot could not make a move.');
     }
-  }, [saveLocalGame, sounds]);
+  }, [animateLocalResolution, animateLocalShot, saveLocalGame]);
 
   useEffect(() => {
     if (botTimer.current) clearTimeout(botTimer.current);
@@ -700,6 +1004,27 @@ export default function IndexScreen() {
       await Share.share({ message: `Join my Snake & Ladder Adventure room: ${code}` });
     } catch {
       setActionError(`Room code: ${code}`);
+    }
+  };
+
+  const sendRoomChat = async () => {
+    const session = online.session;
+    const room = online.room;
+    const text = chatDraft.trim();
+    if (!session || !room || !online.connected || !text || chatSending || room.status === 'closed') return;
+    setChatSending(true);
+    setActionError(null);
+    try {
+      await sendRoomCommunication(
+        session.code,
+        { type: 'chat', text },
+        { headers: { Authorization: `Bearer ${session.token}` } },
+      );
+      setChatDraft('');
+    } catch (reason) {
+      setActionError(reason instanceof Error ? reason.message : 'The room message could not be sent.');
+    } finally {
+      setChatSending(false);
     }
   };
 
@@ -836,6 +1161,18 @@ export default function IndexScreen() {
     </View>
   );
 
+  if (!storageReady) {
+    return (
+      <View style={[styles.screen, styles.launchLoading, { backgroundColor: colors.background }]} testID="launch-loading">
+        <View style={[styles.brandMark, { backgroundColor: colors.secondary, borderColor: colors.primary }]}>
+          <MaterialCommunityIcons name="crown" size={22} color={colors.primary} />
+        </View>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.note, { color: colors.mutedForeground }]}>Opening your game board…</Text>
+      </View>
+    );
+  }
+
   if (!showGame || !game || !currentPlayer) {
     return (
       <KeyboardAwareScrollViewCompat
@@ -860,10 +1197,19 @@ export default function IndexScreen() {
             icon={<Feather name={muted ? 'volume-x' : 'volume-2'} size={18} color={colors.foreground} />}
             testID="sound-toggle"
           />
+          {!!localGame && (
+            <SmallIconButton
+              label="Return to game"
+              onPress={() => setScreen('game')}
+              colors={colors}
+              icon={<Feather name="arrow-left" size={17} color={colors.foreground} />}
+              testID="return-to-game"
+            />
+          )}
         </View>
 
         <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.eyebrow, { color: colors.primary }]}>A CLASSIC QUEST, WITH A TWIST</Text>
+            <Text style={[styles.eyebrow, { color: colors.primary }]}>A CLASSIC QUEST, WITH A TWIST</Text>
           <Text style={[styles.heroTitle, { color: colors.foreground }]}>Roll, climb, and claim the crown.</Text>
           <Text style={[styles.body, { color: colors.mutedForeground }]}>
             Reach 100 for a torch, find a key in a black room, then return to unlock the crown.
@@ -980,6 +1326,192 @@ export default function IndexScreen() {
   const turnLocked = actionDisabled || !currentPlayerIsHuman;
   const noUnspentLandingChoice = !game.pendingChoice && !game.pendingFireForPlayerId;
   const powerButtons = currentPlayer.powers;
+  const webTargets = activeRivals.filter((rival) =>
+    powerButtons.webShooter > 0 && rival.position > currentPlayer.position && rival.position - currentPlayer.position <= 3);
+  const knifeTargets = activeRivals.filter((rival) =>
+    powerButtons.knife > 0 && currentPlayer.position > 0 && rival.position === currentPlayer.position);
+  const powerLabels: Record<PowerSlot, string> = {
+    bomb: 'Bomb',
+    antiVenom: 'Anti-Venom',
+    defuser: 'Bomb Defuser Kit',
+    webShooter: 'Web Shooter',
+    knife: 'Knife',
+    extraDice: 'Extra Dice',
+  };
+  const powerDescriptions: Record<PowerSlot, string> = {
+    bomb: 'Plant one in your room. Detonate it immediately or wait for a rival to arrive.',
+    antiVenom: 'Protects against one snake bite. Choose whether to use it when you land on a snake.',
+    defuser: 'Disarms one bomb. Choose whether to use it when a bomb is triggered.',
+    webShooter: 'Pull a rival up to three rooms ahead back to your room.',
+    knife: 'Strike a rival who is standing in your room.',
+    extraDice: 'Use a stored extra roll before rolling the regular die.',
+  };
+  const renderPowerDetails = () => {
+    if (!activePower) return null;
+    const count = powerButtons[activePower];
+    const available = !turnLocked && !game.winnerId;
+    const defenseKind = game.pendingChoice?.kind;
+    const showAntiVenomChoice = activePower === 'antiVenom' && defenseKind === 'snake';
+    const showDefuserChoice = activePower === 'defuser' && defenseKind === 'bomb';
+    return (
+      <View style={[styles.powerDetails, { backgroundColor: colors.card, borderColor: colors.border }]} testID="power-details">
+        <View style={styles.powerDetailsHeading}>
+          <View style={[styles.powerDetailsIcon, { backgroundColor: activePower === 'bomb' ? '#c54d58' : activePower === 'knife' ? '#7449ac' : '#2579ad' }]}>
+            {activePower === 'extraDice'
+              ? <MaterialCommunityIcons name="dice-multiple" size={21} color="#fff9e7" />
+              : <PowerGlyph power={activePower} size={23} />}
+          </View>
+          <View style={styles.powerDetailsCopy}>
+            <Text style={[styles.powerDetailsTitle, { color: colors.foreground }]}>{powerLabels[activePower]}</Text>
+            <Text style={[styles.powerDetailsCount, { color: colors.mutedForeground }]}>{count} in inventory</Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close power details"
+            onPress={() => setActivePower(null)}
+            style={styles.powerDetailsClose}
+          >
+            <Feather name="x" size={15} color={colors.mutedForeground} />
+          </Pressable>
+        </View>
+        <Text style={[styles.note, { color: colors.mutedForeground }]}>{powerDescriptions[activePower]}</Text>
+        {showAntiVenomChoice || showDefuserChoice ? (
+          <View style={styles.wrapRow}>
+            <SolidButton
+              label="Use protection"
+              icon={<PowerGlyph power={showAntiVenomChoice ? 'antiVenom' : 'defuser'} size={24} />}
+              onPress={() => currentPowerAction({ type: 'defense', use: true }, (state) => resolveDefense(state, true))}
+              colors={colors}
+              disabled={!available}
+              compact
+            />
+            <SolidButton
+              label="Save it"
+              onPress={() => currentPowerAction({ type: 'defense', use: false }, (state) => resolveDefense(state, false))}
+              colors={colors}
+              secondary
+              disabled={!available}
+              compact
+            />
+          </View>
+        ) : (
+          <View style={styles.wrapRow}>
+            {activePower === 'extraDice' && count > 0 && (
+              <SolidButton
+                label="Roll extra dice"
+                icon={<MaterialCommunityIcons name="dice-multiple" size={15} color={colors.secondaryForeground} />}
+                onPress={() => currentPowerAction({ type: 'extraDice' }, (state) => useExtraDice(state))}
+                colors={colors}
+                secondary
+                compact
+                disabled={!available || !noUnspentLandingChoice}
+              />
+            )}
+            {activePower === 'bomb' && (
+              <>
+                {readyToPlant && (
+                  <SolidButton
+                    label="Plant bomb here"
+                    icon={<PowerGlyph power="bomb" size={24} />}
+                    onPress={() => currentPowerAction({ type: 'plant', square: currentPlayer.position }, (state) => plantBomb(state, currentPlayer.position))}
+                    colors={colors}
+                    secondary
+                    compact
+                    disabled={!available || !noUnspentLandingChoice}
+                  />
+                )}
+                {!!usableBomb && (
+                  <SolidButton
+                    label={`Detonate room ${usableBomb.square}`}
+                    icon={<PowerGlyph power="bomb" size={24} />}
+                    onPress={() => currentPowerAction({ type: 'detonate', bombId: usableBomb.id }, (state) => detonateBomb(state, usableBomb.id, online.session?.playerId ?? usableBomb.ownerId))}
+                    colors={colors}
+                    destructive
+                    compact
+                    disabled={rolling || online.busy || onlineMode && !online.canDetonate}
+                    testID="detonate-bomb"
+                  />
+                )}
+                {!readyToPlant && !usableBomb && (
+                  <Text style={[styles.note, { color: colors.mutedForeground }]}>Bombs can be planted only while you are on a room.</Text>
+                )}
+              </>
+            )}
+            {activePower === 'webShooter' && (
+              webTargets.length > 0
+                ? webTargets.map((rival) => (
+                  <SolidButton
+                    key={`web-${rival.id}`}
+                    label={`Web · ${rival.name}`}
+                    icon={<PowerGlyph power="webShooter" size={24} />}
+                    onPress={() => currentPowerAction({ type: 'web', targetPlayerId: rival.id }, (state) => useWebShooter(state, rival.id))}
+                    colors={colors}
+                    secondary
+                    compact
+                    disabled={!available || !noUnspentLandingChoice}
+                  />
+                ))
+                : <Text style={[styles.note, { color: colors.mutedForeground }]}>No rival is within web-shooter range.</Text>
+            )}
+            {activePower === 'knife' && (
+              knifeTargets.length > 0
+                ? knifeTargets.map((rival) => (
+                  <SolidButton
+                    key={`knife-${rival.id}`}
+                    label={`Knife · ${rival.name}`}
+                    icon={<PowerGlyph power="knife" size={24} />}
+                    onPress={() => currentPowerAction({ type: 'knife', targetPlayerId: rival.id }, (state) => useKnife(state, rival.id))}
+                    colors={colors}
+                    secondary
+                    compact
+                    disabled={!available || !noUnspentLandingChoice}
+                  />
+                ))
+                : <Text style={[styles.note, { color: colors.mutedForeground }]}>A rival must share your room to use the knife.</Text>
+            )}
+            {(activePower === 'antiVenom' || activePower === 'defuser') && (
+              <Text style={[styles.note, { color: colors.mutedForeground }]}>
+                {activePower === 'antiVenom' ? 'Its choice appears when you land on a snake.' : 'Its choice appears when a bomb is triggered.'}
+              </Text>
+            )}
+          </View>
+        )}
+      </View>
+    );
+  };
+  const renderDiceButton = () => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={rolling ? 'Dice rolling' : onlineMode && !online.canAct ? 'Waiting for your turn' : 'Roll dice'}
+      onPress={() => void applyRoll()}
+      disabled={turnLocked || !!game.winnerId || !!game.pendingChoice || !!game.pendingFireForPlayerId || (onlineMode && roomStatus?.status !== 'playing')}
+      style={[
+        styles.diceButton,
+        {
+          backgroundColor: colors.primary,
+          borderColor: colors.boardFrameLight,
+          opacity: turnLocked || !!game.winnerId || !!game.pendingChoice || !!game.pendingFireForPlayerId || (onlineMode && roomStatus?.status !== 'playing') ? 0.55 : 1,
+        },
+      ]}
+      testID="roll-dice"
+    >
+      <View style={styles.dicePipsGrid}>
+        {Array.from({ length: 9 }, (_, pipIndex) => (
+          <View key={pipIndex} style={styles.dicePipCell}>
+            <View
+              style={[
+                styles.dicePip,
+                {
+                  backgroundColor: colors.primaryForeground,
+                  opacity: DICE_PIP_POSITIONS[diceFace ?? game.lastRoll ?? 1]?.includes(pipIndex) ? 1 : 0,
+                },
+              ]}
+            />
+          </View>
+        ))}
+      </View>
+    </Pressable>
+  );
 
   return (
     <ScrollView
@@ -1018,19 +1550,148 @@ export default function IndexScreen() {
           />
           {!onlineMode && (
             <SmallIconButton
-              label="Back to games"
+              label="New game setup"
               onPress={() => setScreen('home')}
               colors={colors}
-              icon={<Feather name="home" size={17} color={colors.foreground} />}
-              testID="back-home"
+              icon={<Feather name="plus" size={17} color={colors.foreground} />}
+              testID="open-new-game"
             />
           )}
         </View>
       </View>
 
       {onlineMode && renderRoomCard(true)}
+      {!!online.session && !!roomStatus && (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${chatOpen ? 'Close' : 'Open'} room chat with ${roomStatus.chatMessages.length} messages`}
+            accessibilityState={{ expanded: chatOpen }}
+            testID="room-comms-toggle"
+            onPress={() => setChatOpen((open) => !open)}
+            style={[styles.chatToggle, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+          >
+            <Feather name="message-circle" size={15} color={colors.accent} />
+            <Text style={[styles.chatToggleText, { color: colors.foreground }]}>Room chat</Text>
+            <Text style={[styles.chatCount, { color: colors.mutedForeground }]}>{roomStatus.chatMessages.length}</Text>
+            <Feather name={chatOpen ? 'chevron-up' : 'chevron-down'} size={15} color={colors.mutedForeground} />
+          </Pressable>
+          {chatOpen && (
+            <View style={[styles.chatPanel, { backgroundColor: colors.card, borderColor: colors.border }]} testID="room-chat-voice">
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Room messages</Text>
+              <ScrollView style={styles.chatLog} nestedScrollEnabled keyboardShouldPersistTaps="handled" testID="room-chat-log">
+                {roomStatus.chatMessages.length === 0
+                  ? <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No messages yet. Say hello to the room.</Text>
+                  : roomStatus.chatMessages.map((message) => (
+                    <View key={message.id} style={[styles.chatMessage, { borderColor: colors.border, backgroundColor: message.playerId === online.session?.playerId ? colors.secondary : colors.background }]}>
+                      <View style={styles.chatMessageHeader}>
+                        <Text style={[styles.chatMessageName, { color: colors.foreground }]}>{message.playerName}</Text>
+                        <Text style={[styles.chatMessageTime, { color: colors.mutedForeground }]}>
+                          {new Date(message.sentAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                        </Text>
+                      </View>
+                      <Text style={[styles.chatMessageText, { color: colors.foreground }]}>{message.text}</Text>
+                    </View>
+                  ))}
+              </ScrollView>
+              <View style={styles.chatInputRow}>
+                <TextInput
+                  value={chatDraft}
+                  onChangeText={setChatDraft}
+                  placeholder="Write a message…"
+                  placeholderTextColor={colors.mutedForeground}
+                  maxLength={400}
+                  editable={online.connected && roomStatus.status !== 'closed' && !chatSending}
+                  returnKeyType="send"
+                  onSubmitEditing={() => void sendRoomChat()}
+                  accessibilityLabel="Room message"
+                  testID="room-chat-input"
+                  style={[styles.chatInput, { color: colors.foreground, backgroundColor: colors.input, borderColor: colors.border }]}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Send room message"
+                  testID="send-room-message"
+                  disabled={!online.connected || roomStatus.status === 'closed' || chatSending || !chatDraft.trim()}
+                  onPress={() => void sendRoomChat()}
+                  style={[styles.chatSendButton, { backgroundColor: colors.primary, opacity: !online.connected || chatSending || !chatDraft.trim() ? 0.45 : 1 }]}
+                >
+                  {chatSending ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Feather name="send" size={15} color={colors.primaryForeground} />}
+                </Pressable>
+              </View>
+            </View>
+          )}
+        </>
+      )}
+      {!onlineMode && (
+        <View style={[styles.onlineEntry, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${onlinePanelOpen ? 'Close' : 'Open'} online play controls`}
+            accessibilityState={{ expanded: onlinePanelOpen }}
+            testID="online-mode-toggle"
+            onPress={() => setOnlinePanelOpen((open) => !open)}
+            style={styles.onlineEntryToggle}
+          >
+            <View style={styles.onlineEntryTitle}>
+              <Feather name="globe" size={15} color={colors.accent} />
+              <Text style={[styles.onlineEntryLabel, { color: colors.foreground }]}>Play Online</Text>
+            </View>
+            <Feather name={onlinePanelOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedForeground} />
+          </Pressable>
+          {onlinePanelOpen && (
+            <View style={styles.onlineEntryContent}>
+              <Field value={playerName} onChangeText={setPlayerName} placeholder="Your name" maxLength={24} colors={colors} testID="room-player-name" accessibilityLabel="Your name for online play" />
+              <View style={styles.roomSizeRow}>
+                {[2, 3, 4].map((count) => (
+                  <Pressable
+                    key={count}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: roomPlayerCount === count }}
+                    testID={`room-size-${count}`}
+                    onPress={() => setRoomPlayerCount(count)}
+                    style={[
+                      styles.roomSizeChip,
+                      { backgroundColor: roomPlayerCount === count ? colors.primary : colors.secondary, borderColor: colors.border },
+                    ]}
+                  >
+                    <Text style={[styles.roomSizeLabel, { color: roomPlayerCount === count ? colors.primaryForeground : colors.secondaryForeground }]}>{count} players</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <SolidButton
+                label={online.busy ? 'Creating room…' : 'Create Room'}
+                icon={<Feather name="plus" size={15} color={colors.primaryForeground} />}
+                onPress={createOnlineRoom}
+                colors={colors}
+                disabled={online.busy || online.loadingSession}
+                testID="create-room"
+              />
+              <View style={styles.inputRow}>
+                <Field
+                  value={roomCode}
+                  onChangeText={(value) => setRoomCode(value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+                  placeholder="6-character code"
+                  maxLength={6}
+                  autoCapitalize="characters"
+                  colors={colors}
+                  testID="room-code-input"
+                  accessibilityLabel="Room code"
+                />
+                <SolidButton label="Join" onPress={joinOnlineRoom} colors={colors} secondary disabled={online.busy || roomCode.trim().length !== 6} testID="join-room" />
+              </View>
+              {!!online.error && <Text style={[styles.errorText, { color: colors.destructive }]}>{online.error}</Text>}
+              <Text style={[styles.note, { color: colors.mutedForeground }]}>Invite friends on separate devices. Your local saved rounds stay separate.</Text>
+            </View>
+          )}
+        </View>
+      )}
       <GameBoard
         game={game}
+        walking={walking}
+        shot={shot}
+        firing={firing}
+        pickupNotice={pickupNotice}
         selectedTargets={selectedTargets}
         bombBlast={bombBlast}
         mysterySquare={game.pendingChoice?.kind === 'mystery' ? game.pendingChoice.square : null}
@@ -1040,32 +1701,19 @@ export default function IndexScreen() {
       />
 
       <View style={styles.actionPanel} testID="game-controls">
-        {noUnspentLandingChoice && !game.winnerId && currentPlayerIsHuman && (
-          <View style={styles.powerBlock}>
-            <Text style={[styles.powerBlockLabel, { color: colors.mutedForeground }]}>POWER STASH</Text>
-            <View style={[styles.wrapRow, styles.powerButtonRow]}>
-              {powerButtons.extraDice > 0 && (
-                <SolidButton label={`Extra Dice · ${powerButtons.extraDice}`} icon={<MaterialCommunityIcons name="dice-multiple" size={15} color={colors.secondaryForeground} />} onPress={() => currentPowerAction({ type: 'extraDice' }, (state) => useExtraDice(state))} colors={colors} secondary compact disabled={turnLocked} />
-              )}
-              {powerButtons.webShooter > 0 && activeRivals.filter((rival) => rival.position > currentPlayer.position && rival.position - currentPlayer.position <= 3).map((rival) => (
-                <SolidButton key={`web-${rival.id}`} label={`Web · ${rival.name}`} icon={<PowerGlyph power="webShooter" size={24} />} onPress={() => currentPowerAction({ type: 'web', targetPlayerId: rival.id }, (state) => useWebShooter(state, rival.id))} colors={colors} secondary compact disabled={turnLocked} />
-              ))}
-              {powerButtons.knife > 0 && activeRivals.filter((rival) => currentPlayer.position > 0 && rival.position === currentPlayer.position).map((rival) => (
-                <SolidButton key={`knife-${rival.id}`} label={`Knife · ${rival.name}`} icon={<PowerGlyph power="knife" size={24} />} onPress={() => currentPowerAction({ type: 'knife', targetPlayerId: rival.id }, (state) => useKnife(state, rival.id))} colors={colors} secondary compact disabled={turnLocked} />
-              ))}
-              {readyToPlant && (
-                <SolidButton label="Plant bomb here" icon={<PowerGlyph power="bomb" size={24} />} onPress={() => currentPowerAction({ type: 'plant', square: currentPlayer.position }, (state) => plantBomb(state, currentPlayer.position))} colors={colors} secondary compact disabled={turnLocked} />
-              )}
-              {!!usableBomb && (
-                <SolidButton label={`Detonate room ${usableBomb.square}`} icon={<PowerGlyph power="bomb" size={24} />} destructive onPress={() => currentPowerAction({ type: 'detonate', bombId: usableBomb.id }, (state) => detonateBomb(state, usableBomb.id, online.session?.playerId ?? usableBomb.ownerId))} colors={colors} compact disabled={rolling || online.busy || onlineMode && !online.canDetonate} testID="detonate-bomb" />
-              )}
-              {powerButtons.antiVenom + powerButtons.defuser + powerButtons.bomb + powerButtons.webShooter + powerButtons.knife + powerButtons.extraDice === 0 && (
-                <Text style={[styles.note, { color: colors.mutedForeground }]}>Land on a mystery room to choose a power.</Text>
-              )}
-            </View>
+        <View style={waitingForShot ? styles.controlDockAiming : styles.controlDock}>
+        {!waitingForShot && !game.winnerId && currentPlayerIsHuman && (
+          <View style={styles.powerControls}>
+            <PowerInventoryRow
+              powers={powerButtons}
+              selected={activePower}
+              onSelect={(power) => setActivePower((current) => current === power ? null : power)}
+              disabled={turnLocked}
+              centerControl={renderDiceButton()}
+            />
+            {renderPowerDetails()}
           </View>
         )}
-
         {waitingForShot ? (
           <View style={[styles.aimFlow, { backgroundColor: colors.background, borderColor: colors.border }]} testID="fire-choice">
             <View style={styles.aimHeader}>
@@ -1155,47 +1803,10 @@ export default function IndexScreen() {
               </>
             )}
           </View>
-        ) : (
-          <View style={styles.rollDock}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={rolling ? 'Dice rolling' : onlineMode && !online.canAct ? 'Waiting for your turn' : 'Roll dice'}
-              onPress={() => void applyRoll()}
-              disabled={turnLocked || !!game.winnerId || !!game.pendingChoice || !!game.pendingFireForPlayerId || (onlineMode && roomStatus?.status !== 'playing')}
-              style={[
-                styles.diceButton,
-                {
-                  backgroundColor: colors.primary,
-                  borderColor: colors.boardFrameLight,
-                  opacity: turnLocked || !!game.winnerId || !!game.pendingChoice || !!game.pendingFireForPlayerId || (onlineMode && roomStatus?.status !== 'playing') ? 0.55 : 1,
-                },
-              ]}
-              testID="roll-dice"
-            >
-              <View style={styles.dicePipsGrid}>
-                {Array.from({ length: 9 }, (_, pipIndex) => (
-                  <View key={pipIndex} style={styles.dicePipCell}>
-                    <View
-                      style={[
-                        styles.dicePip,
-                        {
-                          backgroundColor: colors.primaryForeground,
-                          opacity: DICE_PIP_POSITIONS[diceFace ?? game.lastRoll ?? 1]?.includes(pipIndex) ? 1 : 0,
-                        },
-                      ]}
-                    />
-                  </View>
-                ))}
-              </View>
-            </Pressable>
-            <Text style={[styles.rollLabel, { color: colors.mutedForeground }]}>
-              {rolling ? 'ROLLING…' : onlineMode && !online.canAct ? 'WAITING FOR TURN' : 'ROLL DICE'}
-            </Text>
-            <Text style={[styles.rollCount, { color: colors.foreground }]}>
-              {diceFace ?? game.lastRoll ?? 'Ready'}
-            </Text>
-          </View>
-        )}
+        ) : !game.winnerId && !currentPlayerIsHuman ? (
+          <View style={styles.rollDock}>{renderDiceButton()}</View>
+        ) : null}
+        </View>
         {onlineMode && roomStatus?.status === 'waiting' && (
           <Text style={[styles.note, { color: colors.mutedForeground }]}>Share the room code above. The round begins when all {roomStatus.maxPlayers} players are ready.</Text>
         )}
@@ -1209,26 +1820,10 @@ export default function IndexScreen() {
         {(game.pendingChoice?.kind === 'snake' || game.pendingChoice?.kind === 'bomb') && (
           <View style={styles.choiceBlock}>
             <Text style={[styles.sectionLabel, { color: colors.foreground }]}>
-              {game.pendingChoice.kind === 'snake' ? 'A snake is here. Use Anti-Venom?' : 'A bomb room. Use a Defuser Kit?'}
+              {game.pendingChoice.kind === 'snake'
+                ? 'A snake is here. Tap Anti-Venom above to use it or save it.'
+                : 'A bomb was triggered. Tap Defuser Kit above to use it or save it.'}
             </Text>
-            <View style={styles.row}>
-              <SolidButton
-                label="Use protection"
-                icon={<PowerGlyph power={game.pendingChoice.kind === 'snake' ? 'antiVenom' : 'defuser'} size={27} />}
-                onPress={() => currentPowerAction({ type: 'defense', use: true }, (state) => resolveDefense(state, true))}
-                colors={colors}
-                disabled={!currentPlayerIsHuman || actionDisabled || onlineMode && !online.canAct}
-                compact
-              />
-              <SolidButton
-                label="Save it"
-                onPress={() => currentPowerAction({ type: 'defense', use: false }, (state) => resolveDefense(state, false))}
-                colors={colors}
-                secondary
-                disabled={!currentPlayerIsHuman || actionDisabled || onlineMode && !online.canAct}
-                compact
-              />
-            </View>
           </View>
         )}
 
@@ -1254,8 +1849,8 @@ export default function IndexScreen() {
                 style={[
                   styles.playerCard,
                   {
-                    backgroundColor: colors.background,
-                    borderColor: index === game.currentPlayerIndex && !game.winnerId ? colorForPlayer(player.color, colors) : colors.border,
+                    backgroundColor: index === game.currentPlayerIndex && !game.winnerId ? colors.activePlayerRow : colors.playerRow,
+                    borderColor: index === game.currentPlayerIndex && !game.winnerId ? colors.primary : colors.border,
                     opacity: crowned ? 0.8 : 1,
                   },
                 ]}
@@ -1306,6 +1901,16 @@ export default function IndexScreen() {
         <Text style={[styles.gameMessage, { color: colors.foreground }]}>{game.message}</Text>
       </View>
 
+      {!onlineMode && !game.winnerId && (
+        <SolidButton
+          label="New Game"
+          icon={<Feather name="plus" size={16} color={colors.primaryForeground} />}
+          onPress={() => setScreen('home')}
+          colors={colors}
+          testID="button-new-game"
+        />
+      )}
+
       {!!game.winnerId && (
         <View style={[styles.card, { backgroundColor: colors.accent, borderColor: colors.accent }]}>
           <Text style={[styles.questTitle, { color: colors.accentForeground }]}>{winningPlayers.map((player) => player.name).join(', ')} claimed the crown!</Text>
@@ -1320,14 +1925,15 @@ export default function IndexScreen() {
 }
 
  const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  homeContent: { paddingHorizontal: 16, gap: 14 },
-  gameContent: { paddingHorizontal: 12, gap: 9 },
+  screen: { flex: 1, backgroundColor: '#171b2c' },
+  launchLoading: { alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 20 },
+  homeContent: { paddingHorizontal: 12, gap: 14 },
+  gameContent: { paddingHorizontal: 12, gap: 8 },
   homeHeader: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 2 },
   brandCopy: { flex: 1 },
   brandTitle: { fontFamily: 'Fredoka_600SemiBold', fontSize: 20, letterSpacing: 0.1 },
   brandSubtitle: { fontFamily: 'monospace', fontSize: 8, letterSpacing: 1.15, marginTop: 1 },
-  heroCard: { padding: 17, borderRadius: 22, borderWidth: 1, gap: 10 },
+  heroCard: { padding: 17, borderRadius: 22, borderWidth: 1, gap: 10, shadowColor: '#080b14', shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.24, shadowRadius: 14, elevation: 4 },
   eyebrow: { fontFamily: 'Nunito_700Bold', fontSize: 10, letterSpacing: 1.1 },
   heroTitle: { fontFamily: 'Fredoka_600SemiBold', fontSize: 28, lineHeight: 32, marginTop: -3 },
   body: { fontFamily: 'Nunito_600SemiBold', fontSize: 14, lineHeight: 20 },
@@ -1340,18 +1946,31 @@ export default function IndexScreen() {
   modeDescription: { fontFamily: 'Nunito_600SemiBold', fontSize: 11, lineHeight: 15 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   wrapRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  powerButtonRow: { justifyContent: 'center', gap: 6 },
-  powerBlock: { alignItems: 'center', gap: 4 },
-  powerBlockLabel: { fontFamily: 'monospace', fontSize: 8, letterSpacing: 1.1, textAlign: 'center' },
+  powerControls: { flex: 1, minWidth: 0, gap: 7 },
+  powerDetails: { padding: 10, borderWidth: 1, borderRadius: 14, gap: 8 },
+  powerDetailsHeading: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  powerDetailsIcon: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  powerDetailsCopy: { flex: 1, minWidth: 0, gap: 1 },
+  powerDetailsTitle: { fontFamily: 'Fredoka_600SemiBold', fontSize: 14 },
+  powerDetailsCount: { fontFamily: 'monospace', fontSize: 8, letterSpacing: 0.35 },
+  powerDetailsClose: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   countChip: { minWidth: 44, minHeight: 42, paddingHorizontal: 12, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   countChipText: { fontFamily: 'Nunito_700Bold', fontSize: 13 },
-  card: { padding: 15, borderRadius: 20, borderWidth: 1, gap: 10 },
+  card: { padding: 15, borderRadius: 20, borderWidth: 1, gap: 10, shadowColor: '#080b14', shadowOffset: { width: 0, height: 7 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 3 },
   compactCard: { padding: 12, borderRadius: 16 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   cardTitle: { fontFamily: 'Fredoka_600SemiBold', fontSize: 20 },
   note: { fontFamily: 'Nunito_600SemiBold', fontSize: 11, lineHeight: 16 },
   roomBadge: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   roomCode: { fontFamily: 'Nunito_700Bold', fontSize: 18, letterSpacing: 2 },
+  onlineEntry: { marginBottom: 10, borderWidth: 1, borderRadius: 14, overflow: 'hidden' },
+  onlineEntryToggle: { minHeight: 46, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  onlineEntryTitle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  onlineEntryLabel: { fontFamily: 'Fredoka_600SemiBold', fontSize: 14 },
+  onlineEntryContent: { paddingHorizontal: 12, paddingBottom: 12, gap: 9 },
+  roomSizeRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  roomSizeChip: { flex: 1, minHeight: 36, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 12 },
+  roomSizeLabel: { fontFamily: 'Nunito_700Bold', fontSize: 11 },
   memberList: { gap: 6 },
   memberRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
@@ -1363,6 +1982,19 @@ export default function IndexScreen() {
   buttonLabelCompact: { fontSize: 12 },
   iconButton: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  chatToggle: { minHeight: 40, paddingHorizontal: 12, borderWidth: 1, borderRadius: 13, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  chatToggleText: { flex: 1, fontFamily: 'Nunito_700Bold', fontSize: 12 },
+  chatCount: { fontFamily: 'monospace', fontSize: 10 },
+  chatPanel: { padding: 12, borderWidth: 1, borderRadius: 16, gap: 8 },
+  chatLog: { maxHeight: 178 },
+  chatMessage: { padding: 9, marginBottom: 6, borderWidth: 1, borderRadius: 12, gap: 4 },
+  chatMessageHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  chatMessageName: { fontFamily: 'Nunito_700Bold', fontSize: 10 },
+  chatMessageTime: { fontFamily: 'monospace', fontSize: 8 },
+  chatMessageText: { fontFamily: 'Nunito_600SemiBold', fontSize: 12, lineHeight: 17 },
+  chatInputRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  chatInput: { flex: 1, minHeight: 42, borderWidth: 1, borderRadius: 13, paddingHorizontal: 11, fontFamily: 'Nunito_600SemiBold', fontSize: 12 },
+  chatSendButton: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   emptyText: { fontFamily: 'Nunito_600SemiBold', fontSize: 12, paddingVertical: 8 },
   roundCount: { fontFamily: 'Nunito_700Bold', fontSize: 13 },
   savedRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10 },
@@ -1370,21 +2002,21 @@ export default function IndexScreen() {
   savedName: { fontFamily: 'Nunito_700Bold', fontSize: 13 },
   roundAction: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   errorText: { fontFamily: 'Nunito_700Bold', fontSize: 12, lineHeight: 17 },
-  gameHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, minHeight: 46 },
-  gameHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 0 },
+  gameHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, minHeight: 46, marginBottom: 2 },
+  gameHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 0 },
   brandLockup: { flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 },
   brandMark: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   gameBrandCopy: { flex: 1, minWidth: 0 },
   gameBrand: { fontFamily: 'Fredoka_600SemiBold', fontSize: 20, lineHeight: 24 },
   gameBrandSubtitle: { fontFamily: 'monospace', fontSize: 8, letterSpacing: 1.15, marginTop: 1 },
-  localModeChip: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 40, paddingHorizontal: 7, borderWidth: 1, borderRadius: 11 },
+  localModeChip: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 32, paddingHorizontal: 9, borderWidth: 1, borderRadius: 99 },
   localModeCaption: { fontFamily: 'monospace', fontSize: 7, letterSpacing: 0.7 },
   localModeName: { fontFamily: 'monospace', fontSize: 7, letterSpacing: 0.2 },
-  statusPanel: { padding: 10, borderRadius: 15, borderWidth: 1, gap: 7 },
-  turnBanner: { minHeight: 28, borderRadius: 0, borderWidth: 0, paddingHorizontal: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statusPanel: { padding: 0, borderRadius: 0, borderWidth: 0, gap: 0, backgroundColor: 'transparent' },
+  turnBanner: { display: 'none', minHeight: 28, borderRadius: 0, borderWidth: 0, paddingHorizontal: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
   turnText: { flex: 1, fontFamily: 'Nunito_700Bold', fontSize: 14 },
   playerStrip: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  playerCard: { flex: 1, flexBasis: 140, minWidth: 0, minHeight: 48, borderRadius: 11, borderWidth: 1, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  playerCard: { flex: 1, flexBasis: 140, minWidth: 0, minHeight: 44, borderRadius: 10, borderWidth: 1, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
   playerDot: { width: 9, height: 9, borderRadius: 5 },
   playerMeta: { flex: 1, minWidth: 0 },
   playerName: { fontFamily: 'Nunito_700Bold', fontSize: 12 },
@@ -1400,10 +2032,12 @@ export default function IndexScreen() {
   questDivider: { fontFamily: 'Fredoka_600SemiBold', fontSize: 17 },
   actionPanel: { paddingVertical: 1, borderRadius: 0, borderWidth: 0, gap: 10 },
   actionTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  rollDock: { alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 2 },
+  controlDock: { width: '100%', minHeight: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 2 },
+  controlDockAiming: { width: '100%' },
+  rollDock: { alignItems: 'center', justifyContent: 'center', paddingVertical: 2 },
   diceButton: {
-    width: 66,
-    height: 66,
+    width: 64,
+    height: 64,
     borderWidth: 2,
     borderRadius: 16,
     alignItems: 'center',
@@ -1417,8 +2051,6 @@ export default function IndexScreen() {
   dicePipsGrid: { width: 39, height: 39, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'space-between', justifyContent: 'space-between' },
   dicePipCell: { width: 13, height: 13, alignItems: 'center', justifyContent: 'center' },
   dicePip: { width: 7, height: 7, borderRadius: 4 },
-  rollLabel: { fontFamily: 'monospace', fontSize: 8, letterSpacing: 1.1 },
-  rollCount: { fontFamily: 'Fredoka_600SemiBold', fontSize: 15, lineHeight: 18 },
   aimFlow: { width: '100%', borderWidth: 1, borderRadius: 15, padding: 10, gap: 9 },
   aimHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   aimAmmo: { fontFamily: 'Nunito_700Bold', fontSize: 10 },

@@ -5,7 +5,7 @@ export type DetailedPower = 'bomb' | 'antiVenom' | 'defuser' | 'webShooter' | 'k
 
 export function PowerGlyph({ power, size = 20 }: { power: DetailedPower; size?: number }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" accessible={false}>
+    <Svg width={size} height={size} viewBox="0 0 24 24" aria-hidden={true}>
       {power === 'bomb' && (
         <>
           <Path d="M10.4 7.4 11 5.5q.2-1.4 1.8-1.6l1.8-.2" stroke="#ffd38a" strokeWidth={1.5} strokeLinecap="round" />
@@ -21,7 +21,7 @@ export function PowerGlyph({ power, size = 20 }: { power: DetailedPower; size?: 
         <>
           <Path d="M3 15.5c1.1-1.9 3.7-.9 3.3.7-.3 1.1-1.9 1.2-2.5.5-.8 1.8.5 3.4 2.5 2.9" fill="none" stroke="#42a938" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
           <Path d="M12 2.7v3.2M8.4 2.7h7.2" stroke="#6e1927" strokeWidth={2} strokeLinecap="round" />
-          <G rotation={-45} originX={12} originY={12}>
+          <G transform="rotate(-45 12 12)">
             <Path d="M8 5.8h8v13.7a1.2 1.2 0 0 1-1.2 1.2h-5.6A1.2 1.2 0 0 1 8 19.5z" fill="#fff7f3" stroke="#812235" strokeWidth={1.5} strokeLinejoin="round" />
             <Path d="M9.5 12.4h5v5.5h-5z" fill="#ef4057" stroke="#b51e37" strokeWidth={0.8} />
             <Path d="M9.5 11h5m-5 3h5m-5 3h5" stroke="#96243a" strokeWidth={0.8} />
