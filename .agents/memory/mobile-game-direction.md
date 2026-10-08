@@ -1,21 +1,21 @@
 ---
 name: Mobile artifact status
-description: The mobile artifact was removed; retain its requirements only if the user explicitly resumes mobile work.
+description: Native mobile is active again; align its game screen with the website while preserving touch controls.
 ---
 
-The user requested an Android app and later deleted the mobile artifact on October 5, 2026. The browser game is the active product. Do not recreate the mobile artifact or APK workflow unless explicitly asked.
+The user explicitly resumed mobile work on October 8, 2026 and asked for its gameplay screen to visually match the website. Both the browser game and Expo app are active.
 
-**Why:** The user removed mobile after preview difficulties and asked that the web game remain unchanged.
+**Why:** The web and mobile clients have separate UI implementations, so visual changes do not carry across automatically. The user noticed the difference and asked for parity.
 
-**How to apply:** Keep final work focused on the browser game. If mobile work is explicitly resumed, use the saved requirements below and preserve the website.
+**How to apply:** For game UI requests, keep the same brand, palette, board treatment and screen hierarchy across clients while retaining mobile touch sizing and native interactions. Do not alter browser gameplay or saved-game behavior unless requested. Do not build an APK unless explicitly asked.
 
-## If mobile work is explicitly requested again
+## Mobile testing
 
 Replit's built-in Android Emulator is available in the desktop Project Editor, not inside the Replit mobile app. The desktop emulator can preview an Expo app without Expo Go on a personal phone; testing directly on a phone uses Expo Go. A mobile website route is not a substitute for the native Expo app. The expected launch flow is loading, player-name setup, play-mode selection, then the playable game. An installable Android package is separate work and should only be built when explicitly requested.
 
-**Why:** The user corrected an earlier mobile web route and asked for a functioning native preview instead of an APK. Replit documentation clarified that the emulator is desktop-editor-only, which explains why trying to use it inside the phone app cannot launch the app.
+**Why:** The user expects a functioning native preview rather than a mobile web route or an automatically generated APK. The desktop editor's emulator is not available inside the Replit mobile app.
 
-**How to apply:** If asked to restore mobile work, keep the browser game intact and use the desktop Project Editor's Android Emulator for no-personal-phone testing; do not direct the user to open that emulator inside Replit mobile.
+**How to apply:** Use the desktop Project Editor's Android Emulator for device testing without a personal phone; use Expo Go for personal-phone testing. Do not tell the user to open the desktop emulator inside Replit mobile.
 
 ## Sound scope
 
