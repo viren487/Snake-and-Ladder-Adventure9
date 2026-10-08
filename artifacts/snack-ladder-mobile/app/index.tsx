@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Keyboard,
   Platform,
   Pressable,
@@ -55,6 +54,15 @@ import { GameBoard, type BoardBlast } from '@/components/GameBoard';
 import { PowerGlyph } from '@/components/PowerGlyph';
 import { useColors } from '@/hooks/useColors';
 import { useGameSounds } from '@/lib/game-sounds';
+
+const DICE_PIP_POSITIONS: Record<number, readonly number[]> = {
+  1: [4],
+  2: [0, 8],
+  3: [0, 4, 8],
+  4: [0, 2, 6, 8],
+  5: [0, 2, 4, 6, 8],
+  6: [0, 2, 3, 5, 6, 8],
+};
 
 type LocalMode = 'pass' | 'bot';
 type Screen = 'home' | 'game';
@@ -838,10 +846,12 @@ export default function IndexScreen() {
         testID="home-screen"
       >
         <View style={styles.homeHeader}>
-          <Image source={require('../assets/images/icon.png')} style={styles.appIcon} accessibilityLabel="Panda with a crown" />
+        <View style={[styles.brandMark, { backgroundColor: colors.secondary, borderColor: colors.primary }]}>
+          <MaterialCommunityIcons name="crown" size={22} color={colors.primary} />
+        </View>
           <View style={styles.brandCopy}>
-            <Text style={[styles.brandTitle, { color: colors.foreground }]}>Snake & Ladder</Text>
-            <Text style={[styles.brandSubtitle, { color: colors.mutedForeground }]}>ADVENTURE · PANDA EDITION</Text>
+          <Text style={[styles.brandTitle, { color: colors.foreground }]}>Snakes &amp; Ladders</Text>
+          <Text style={[styles.brandSubtitle, { color: colors.mutedForeground }]}>A TINY QUEST FOR TWO</Text>
           </View>
           <SmallIconButton
             label={muted ? 'Turn sound on' : 'Mute sound'}
@@ -970,13 +980,6 @@ export default function IndexScreen() {
   const turnLocked = actionDisabled || !currentPlayerIsHuman;
   const noUnspentLandingChoice = !game.pendingChoice && !game.pendingFireForPlayerId;
   const powerButtons = currentPlayer.powers;
-  const playerProgress = (game.winnerIds ?? []).includes(currentPlayer.id) || game.winnerId === currentPlayer.id
-    ? 'Crown claimed'
-    : currentPlayer.crownKeyRoom !== null
-      ? 'Return to 100 with your key'
-      : currentPlayer.hasTorch
-        ? 'Find a key in room 17, 44 or 67'
-        : 'Reach 100 to collect the torch';
 
   return (
     <ScrollView
@@ -991,12 +994,21 @@ export default function IndexScreen() {
           <View style={[styles.brandMark, { backgroundColor: colors.secondary, borderColor: colors.primary }]}>
             <MaterialCommunityIcons name="crown" size={22} color={colors.primary} />
           </View>
-          <View>
+          <View style={styles.gameBrandCopy}>
             <Text style={[styles.gameBrand, { color: colors.foreground }]}>Snakes &amp; Ladders</Text>
-            <Text style={[styles.brandSubtitle, { color: colors.mutedForeground }]}>A TINY QUEST FOR TWO</Text>
+            <Text style={[styles.gameBrandSubtitle, { color: colors.mutedForeground }]}>A TINY QUEST FOR TWO</Text>
           </View>
         </View>
-        <View style={styles.row}>
+        <View style={styles.gameHeaderActions}>
+          {!onlineMode && (
+            <View style={[styles.localModeChip, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+              <View style={[styles.statusDot, { backgroundColor: colors.accent }]} />
+              <View>
+                <Text style={[styles.localModeCaption, { color: colors.mutedForeground }]}>LOCAL</Text>
+                <Text style={[styles.localModeName, { color: colors.foreground }]}>{localMode === 'bot' ? 'VS MR. BOT' : 'PASS & PLAY'}</Text>
+              </View>
+            </View>
+          )}
           <SmallIconButton
             label={muted ? 'Turn sound on' : 'Mute sound'}
             onPress={() => sounds.toggleMuted()}
@@ -1028,6 +1040,32 @@ export default function IndexScreen() {
       />
 
       <View style={styles.actionPanel} testID="game-controls">
+        {noUnspentLandingChoice && !game.winnerId && currentPlayerIsHuman && (
+          <View style={styles.powerBlock}>
+            <Text style={[styles.powerBlockLabel, { color: colors.mutedForeground }]}>POWER STASH</Text>
+            <View style={[styles.wrapRow, styles.powerButtonRow]}>
+              {powerButtons.extraDice > 0 && (
+                <SolidButton label={`Extra Dice · ${powerButtons.extraDice}`} icon={<MaterialCommunityIcons name="dice-multiple" size={15} color={colors.secondaryForeground} />} onPress={() => currentPowerAction({ type: 'extraDice' }, (state) => useExtraDice(state))} colors={colors} secondary compact disabled={turnLocked} />
+              )}
+              {powerButtons.webShooter > 0 && activeRivals.filter((rival) => rival.position > currentPlayer.position && rival.position - currentPlayer.position <= 3).map((rival) => (
+                <SolidButton key={`web-${rival.id}`} label={`Web · ${rival.name}`} icon={<PowerGlyph power="webShooter" size={24} />} onPress={() => currentPowerAction({ type: 'web', targetPlayerId: rival.id }, (state) => useWebShooter(state, rival.id))} colors={colors} secondary compact disabled={turnLocked} />
+              ))}
+              {powerButtons.knife > 0 && activeRivals.filter((rival) => currentPlayer.position > 0 && rival.position === currentPlayer.position).map((rival) => (
+                <SolidButton key={`knife-${rival.id}`} label={`Knife · ${rival.name}`} icon={<PowerGlyph power="knife" size={24} />} onPress={() => currentPowerAction({ type: 'knife', targetPlayerId: rival.id }, (state) => useKnife(state, rival.id))} colors={colors} secondary compact disabled={turnLocked} />
+              ))}
+              {readyToPlant && (
+                <SolidButton label="Plant bomb here" icon={<PowerGlyph power="bomb" size={24} />} onPress={() => currentPowerAction({ type: 'plant', square: currentPlayer.position }, (state) => plantBomb(state, currentPlayer.position))} colors={colors} secondary compact disabled={turnLocked} />
+              )}
+              {!!usableBomb && (
+                <SolidButton label={`Detonate room ${usableBomb.square}`} icon={<PowerGlyph power="bomb" size={24} />} destructive onPress={() => currentPowerAction({ type: 'detonate', bombId: usableBomb.id }, (state) => detonateBomb(state, usableBomb.id, online.session?.playerId ?? usableBomb.ownerId))} colors={colors} compact disabled={rolling || online.busy || onlineMode && !online.canDetonate} testID="detonate-bomb" />
+              )}
+              {powerButtons.antiVenom + powerButtons.defuser + powerButtons.bomb + powerButtons.webShooter + powerButtons.knife + powerButtons.extraDice === 0 && (
+                <Text style={[styles.note, { color: colors.mutedForeground }]}>Land on a mystery room to choose a power.</Text>
+              )}
+            </View>
+          </View>
+        )}
+
         {waitingForShot ? (
           <View style={[styles.aimFlow, { backgroundColor: colors.background, borderColor: colors.border }]} testID="fire-choice">
             <View style={styles.aimHeader}>
@@ -1118,19 +1156,44 @@ export default function IndexScreen() {
             )}
           </View>
         ) : (
-          <View style={styles.actionTopRow}>
-            <View>
-              <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>LAST ROLL</Text>
-              <Text style={[styles.diceResult, { color: colors.foreground }]}>{diceFace ?? game.lastRoll ?? '—'}</Text>
-            </View>
-            <SolidButton
-              label={rolling ? 'Rolling…' : onlineMode && !online.canAct ? 'Waiting for turn' : 'Roll dice'}
-              icon={<MaterialCommunityIcons name="dice-6" size={20} color={colors.primaryForeground} />}
+          <View style={styles.rollDock}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={rolling ? 'Dice rolling' : onlineMode && !online.canAct ? 'Waiting for your turn' : 'Roll dice'}
               onPress={() => void applyRoll()}
-              colors={colors}
               disabled={turnLocked || !!game.winnerId || !!game.pendingChoice || !!game.pendingFireForPlayerId || (onlineMode && roomStatus?.status !== 'playing')}
+              style={[
+                styles.diceButton,
+                {
+                  backgroundColor: colors.primary,
+                  borderColor: colors.boardFrameLight,
+                  opacity: turnLocked || !!game.winnerId || !!game.pendingChoice || !!game.pendingFireForPlayerId || (onlineMode && roomStatus?.status !== 'playing') ? 0.55 : 1,
+                },
+              ]}
               testID="roll-dice"
-            />
+            >
+              <View style={styles.dicePipsGrid}>
+                {Array.from({ length: 9 }, (_, pipIndex) => (
+                  <View key={pipIndex} style={styles.dicePipCell}>
+                    <View
+                      style={[
+                        styles.dicePip,
+                        {
+                          backgroundColor: colors.primaryForeground,
+                          opacity: DICE_PIP_POSITIONS[diceFace ?? game.lastRoll ?? 1]?.includes(pipIndex) ? 1 : 0,
+                        },
+                      ]}
+                    />
+                  </View>
+                ))}
+              </View>
+            </Pressable>
+            <Text style={[styles.rollLabel, { color: colors.mutedForeground }]}>
+              {rolling ? 'ROLLING…' : onlineMode && !online.canAct ? 'WAITING FOR TURN' : 'ROLL DICE'}
+            </Text>
+            <Text style={[styles.rollCount, { color: colors.foreground }]}>
+              {diceFace ?? game.lastRoll ?? 'Ready'}
+            </Text>
           </View>
         )}
         {onlineMode && roomStatus?.status === 'waiting' && (
@@ -1169,32 +1232,6 @@ export default function IndexScreen() {
           </View>
         )}
 
-        {noUnspentLandingChoice && !game.winnerId && currentPlayerIsHuman && (
-          <View style={styles.choiceBlock}>
-            <Text style={[styles.sectionLabel, { color: colors.foreground }]}>Power stash</Text>
-            <View style={styles.wrapRow}>
-              {powerButtons.extraDice > 0 && (
-                <SolidButton label={`Extra Dice · ${powerButtons.extraDice}`} icon={<MaterialCommunityIcons name="dice-multiple" size={15} color={colors.secondaryForeground} />} onPress={() => currentPowerAction({ type: 'extraDice' }, (state) => useExtraDice(state))} colors={colors} secondary compact disabled={turnLocked} />
-              )}
-              {powerButtons.webShooter > 0 && activeRivals.filter((rival) => rival.position > currentPlayer.position && rival.position - currentPlayer.position <= 3).map((rival) => (
-                <SolidButton key={`web-${rival.id}`} label={`Web · ${rival.name}`} icon={<PowerGlyph power="webShooter" size={24} />} onPress={() => currentPowerAction({ type: 'web', targetPlayerId: rival.id }, (state) => useWebShooter(state, rival.id))} colors={colors} secondary compact disabled={turnLocked} />
-              ))}
-              {powerButtons.knife > 0 && activeRivals.filter((rival) => currentPlayer.position > 0 && rival.position === currentPlayer.position).map((rival) => (
-                <SolidButton key={`knife-${rival.id}`} label={`Knife · ${rival.name}`} icon={<PowerGlyph power="knife" size={24} />} onPress={() => currentPowerAction({ type: 'knife', targetPlayerId: rival.id }, (state) => useKnife(state, rival.id))} colors={colors} secondary compact disabled={turnLocked} />
-              ))}
-              {readyToPlant && (
-                <SolidButton label="Plant bomb here" icon={<PowerGlyph power="bomb" size={24} />} onPress={() => currentPowerAction({ type: 'plant', square: currentPlayer.position }, (state) => plantBomb(state, currentPlayer.position))} colors={colors} secondary compact disabled={turnLocked} />
-              )}
-              {!!usableBomb && (
-                <SolidButton label={`Detonate room ${usableBomb.square}`} icon={<PowerGlyph power="bomb" size={24} />} destructive onPress={() => currentPowerAction({ type: 'detonate', bombId: usableBomb.id }, (state) => detonateBomb(state, usableBomb.id, online.session?.playerId ?? usableBomb.ownerId))} colors={colors} compact disabled={rolling || online.busy || onlineMode && !online.canDetonate} testID="detonate-bomb" />
-              )}
-            </View>
-            {powerButtons.antiVenom + powerButtons.defuser + powerButtons.bomb + powerButtons.webShooter + powerButtons.knife + powerButtons.extraDice === 0 && (
-              <Text style={[styles.note, { color: colors.mutedForeground }]}>Land on a mystery room to choose a power.</Text>
-            )}
-          </View>
-        )}
-
         {!!actionError && <Text style={[styles.errorText, { color: colors.destructive }]} accessibilityRole="alert">{actionError}</Text>}
         {!!online.error && <Text style={[styles.errorText, { color: colors.destructive }]} accessibilityRole="alert">{online.error}</Text>}
         {!!storageError && <Text style={[styles.note, { color: colors.mutedForeground }]}>{storageError}</Text>}
@@ -1205,7 +1242,6 @@ export default function IndexScreen() {
           <View style={styles.turnBanner}>
             <View style={[styles.statusDot, { backgroundColor: colorForPlayer(currentPlayer.color, colors) }]} />
             <Text style={[styles.turnText, { color: colors.secondaryForeground }]}>{currentPlayer.name}{botTurn ? ' is thinking…' : ' to play'}</Text>
-            <Text style={[styles.modeTag, { color: colors.mutedForeground }]}>{localMode === 'bot' ? 'VS MR. BOT' : 'PASS & PLAY'}</Text>
           </View>
         )}
         <View style={styles.playerStrip}>
@@ -1247,11 +1283,7 @@ export default function IndexScreen() {
         </View>
       </View>
 
-      <View style={[styles.questPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={styles.questHeading}>
-          <Text style={[styles.eyebrow, { color: colors.primary }]}>CROWN QUEST</Text>
-          <Text style={[styles.questTitle, { color: colors.foreground }]}>{playerProgress}</Text>
-        </View>
+      <View style={styles.questPanel} accessibilityLabel="Torch, key and crown quest progress">
         <View style={styles.questSteps}>
           {[
             { label: 'Torch', done: currentPlayer.hasTorch || currentPlayer.crownKeyRoom !== null || !!game.winnerId && game.winnerIds.includes(currentPlayer.id), icon: 'flashlight' },
@@ -1290,12 +1322,11 @@ export default function IndexScreen() {
  const styles = StyleSheet.create({
   screen: { flex: 1 },
   homeContent: { paddingHorizontal: 16, gap: 14 },
-  gameContent: { paddingHorizontal: 12, gap: 11 },
+  gameContent: { paddingHorizontal: 12, gap: 9 },
   homeHeader: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 2 },
-  appIcon: { width: 54, height: 54, borderRadius: 17 },
   brandCopy: { flex: 1 },
-  brandTitle: { fontFamily: 'Fredoka_600SemiBold', fontSize: 22, letterSpacing: 0.1 },
-  brandSubtitle: { fontFamily: 'Nunito_700Bold', fontSize: 9, letterSpacing: 1.35, marginTop: 2 },
+  brandTitle: { fontFamily: 'Fredoka_600SemiBold', fontSize: 20, letterSpacing: 0.1 },
+  brandSubtitle: { fontFamily: 'monospace', fontSize: 8, letterSpacing: 1.15, marginTop: 1 },
   heroCard: { padding: 17, borderRadius: 22, borderWidth: 1, gap: 10 },
   eyebrow: { fontFamily: 'Nunito_700Bold', fontSize: 10, letterSpacing: 1.1 },
   heroTitle: { fontFamily: 'Fredoka_600SemiBold', fontSize: 28, lineHeight: 32, marginTop: -3 },
@@ -1309,6 +1340,9 @@ export default function IndexScreen() {
   modeDescription: { fontFamily: 'Nunito_600SemiBold', fontSize: 11, lineHeight: 15 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   wrapRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  powerButtonRow: { justifyContent: 'center', gap: 6 },
+  powerBlock: { alignItems: 'center', gap: 4 },
+  powerBlockLabel: { fontFamily: 'monospace', fontSize: 8, letterSpacing: 1.1, textAlign: 'center' },
   countChip: { minWidth: 44, minHeight: 42, paddingHorizontal: 12, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   countChipText: { fontFamily: 'Nunito_700Bold', fontSize: 13 },
   card: { padding: 15, borderRadius: 20, borderWidth: 1, gap: 10 },
@@ -1337,26 +1371,54 @@ export default function IndexScreen() {
   roundAction: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   errorText: { fontFamily: 'Nunito_700Bold', fontSize: 12, lineHeight: 17 },
   gameHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, minHeight: 46 },
-  brandLockup: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  gameIcon: { width: 42, height: 42, borderRadius: 13 },
-  gameBrand: { fontFamily: 'Fredoka_600SemiBold', fontSize: 18 },
-  turnBanner: { minHeight: 46, borderRadius: 15, borderWidth: 1, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  gameHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 0 },
+  brandLockup: { flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 },
+  brandMark: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  gameBrandCopy: { flex: 1, minWidth: 0 },
+  gameBrand: { fontFamily: 'Fredoka_600SemiBold', fontSize: 20, lineHeight: 24 },
+  gameBrandSubtitle: { fontFamily: 'monospace', fontSize: 8, letterSpacing: 1.15, marginTop: 1 },
+  localModeChip: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 40, paddingHorizontal: 7, borderWidth: 1, borderRadius: 11 },
+  localModeCaption: { fontFamily: 'monospace', fontSize: 7, letterSpacing: 0.7 },
+  localModeName: { fontFamily: 'monospace', fontSize: 7, letterSpacing: 0.2 },
+  statusPanel: { padding: 10, borderRadius: 15, borderWidth: 1, gap: 7 },
+  turnBanner: { minHeight: 28, borderRadius: 0, borderWidth: 0, paddingHorizontal: 0, flexDirection: 'row', alignItems: 'center', gap: 8 },
   turnText: { flex: 1, fontFamily: 'Nunito_700Bold', fontSize: 14 },
-  modeTag: { fontFamily: 'Nunito_700Bold', fontSize: 9, letterSpacing: 0.9 },
-  playerStrip: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  playerCard: { flexGrow: 1, flexBasis: 145, minWidth: 130, minHeight: 56, borderRadius: 15, borderWidth: 1.5, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 7 },
-  playerDot: { width: 10, height: 10, borderRadius: 5 },
+  playerStrip: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  playerCard: { flex: 1, flexBasis: 140, minWidth: 0, minHeight: 48, borderRadius: 11, borderWidth: 1, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  playerDot: { width: 9, height: 9, borderRadius: 5 },
   playerMeta: { flex: 1, minWidth: 0 },
   playerName: { fontFamily: 'Nunito_700Bold', fontSize: 12 },
-  playerPosition: { fontFamily: 'Nunito_700Bold', fontSize: 8, letterSpacing: 0.7 },
-  ammoText: { fontFamily: 'Nunito_700Bold', fontSize: 11 },
-  questTitle: { fontFamily: 'Fredoka_600SemiBold', fontSize: 20, lineHeight: 25 },
-  questSteps: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 2 },
+  playerPosition: { fontFamily: 'monospace', fontSize: 8, letterSpacing: 0.4 },
+  playerStats: { alignItems: 'flex-end', gap: 3 },
+  playerStatGroup: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  playerStat: { fontFamily: 'monospace', fontSize: 9 },
+  questPanel: { alignSelf: 'center', paddingHorizontal: 4, paddingVertical: 3 },
+  questTitle: { fontFamily: 'Fredoka_600SemiBold', fontSize: 16, lineHeight: 20 },
+  questSteps: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
   questStep: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  questDot: { width: 7, height: 7, borderRadius: 4 },
   questStepText: { fontFamily: 'Nunito_700Bold', fontSize: 11 },
-  actionPanel: { padding: 15, borderRadius: 20, borderWidth: 1, gap: 11 },
+  questDivider: { fontFamily: 'Fredoka_600SemiBold', fontSize: 17 },
+  actionPanel: { paddingVertical: 1, borderRadius: 0, borderWidth: 0, gap: 10 },
   actionTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  rollDock: { alignItems: 'center', justifyContent: 'center', gap: 3, paddingVertical: 2 },
+  diceButton: {
+    width: 66,
+    height: 66,
+    borderWidth: 2,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.22,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  dicePipsGrid: { width: 39, height: 39, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'space-between', justifyContent: 'space-between' },
+  dicePipCell: { width: 13, height: 13, alignItems: 'center', justifyContent: 'center' },
+  dicePip: { width: 7, height: 7, borderRadius: 4 },
+  rollLabel: { fontFamily: 'monospace', fontSize: 8, letterSpacing: 1.1 },
+  rollCount: { fontFamily: 'Fredoka_600SemiBold', fontSize: 15, lineHeight: 18 },
   aimFlow: { width: '100%', borderWidth: 1, borderRadius: 15, padding: 10, gap: 9 },
   aimHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   aimAmmo: { fontFamily: 'Nunito_700Bold', fontSize: 10 },
@@ -1371,7 +1433,8 @@ export default function IndexScreen() {
   aimLeaveLink: { minHeight: 26, justifyContent: 'center', paddingHorizontal: 12 },
   aimLeaveLabel: { fontFamily: 'Nunito_700Bold', fontSize: 11 },
   diceResult: { fontFamily: 'Fredoka_600SemiBold', fontSize: 30, lineHeight: 34 },
-  gameMessage: { fontFamily: 'Nunito_600SemiBold', fontSize: 13, lineHeight: 19 },
+  messagePanel: { flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 1, gap: 8 },
+  gameMessage: { flex: 1, fontFamily: 'Nunito_600SemiBold', fontSize: 12, lineHeight: 17 },
   choiceBlock: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.12)', paddingTop: 10, gap: 8 },
   sectionLabel: { fontFamily: 'Nunito_700Bold', fontSize: 12 },
 });

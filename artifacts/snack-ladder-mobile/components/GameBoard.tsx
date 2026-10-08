@@ -1,6 +1,7 @@
 import React from 'react';
 import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Path } from 'react-native-svg';
 import Animated, {
   Easing,
@@ -474,25 +475,35 @@ export function GameBoard({
       accessibilityLabel="Snake and ladder game board"
       testID="game-board"
     >
+      <LinearGradient
+        colors={[colors.boardFrameLight, colors.boardFrame, colors.boardFrameDark]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.frameGradient}
+        pointerEvents="none"
+      />
       <Animated.View
         onLayout={(event) => {
           const size = Math.min(event.nativeEvent.layout.width, event.nativeEvent.layout.height);
           setBoardSize((previous) => previous === size ? previous : size);
         }}
-        style={[styles.inner, { borderColor: colors.boardFrameLight, backgroundColor: colors.boardGreen }, shakeStyle]}
+        style={[styles.inner, { borderColor: colors.boardFrameDark, backgroundColor: colors.boardGreen }, shakeStyle]}
       >
         <View style={styles.grid}>
           {cells.map(({ row, column, square }) => {
             const locked = (KEY_SQUARES as readonly number[]).includes(square);
             const marked = !!tileMarker(square);
-            const shade = (row + column) % 2 === 0 ? colors.boardCream : colors.boardGreen;
-            const backgroundColor = locked
-              ? colors.boardDark
-              : square === 100
-                ? colors.primary
-                : marked && (BULLET_PICKUP_SQUARES as readonly number[]).includes(square)
-                  ? colors.boardBlue
-                  : shade;
+            const bullet = marked && (BULLET_PICKUP_SQUARES as readonly number[]).includes(square);
+            const tone: [string, string, string] = locked
+              ? [colors.boardDark, colors.boardDark, colors.boardDark]
+              : bullet
+                ? [colors.boardBulletHighlight, colors.boardBulletShadow, colors.boardBulletShadow]
+                : square % 3 === 0
+                  ? [colors.boardBlueHighlight, colors.boardBlue, colors.boardBlueShadow]
+                  : (row + column) % 2 === 0
+                    ? [colors.boardGreenHighlight, colors.boardGreen, colors.boardGreenShadow]
+                    : [colors.boardCreamHighlight, colors.boardCream, colors.boardCreamShadow];
+            const backgroundColor = tone[0];
             const isSnakeTarget = (SHOOTABLE_SNAKE_SQUARES as readonly number[]).includes(square);
             const targetAvailable = isSnakeTarget && game.players[game.currentPlayerIndex]?.snakeStuns[square as ShootableSnakeSquare] === 0;
             const accessibleTarget = targetAvailable && !!onSelectTarget;
@@ -514,12 +525,19 @@ export function GameBoard({
                 onPress={() => onSelectTarget?.(square as ShootableSnakeSquare)}
                 style={[
                   styles.cell,
-                  { backgroundColor, borderColor: locked ? colors.boardFrameLight : colors.transparentBorder },
+                  { backgroundColor, borderColor: locked ? colors.boardDarkBorder : colors.transparentBorder },
                   accessibleTarget && styles.targetCell,
                 ]}
               >
+                <LinearGradient
+                  colors={tone}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.cellBackground}
+                  pointerEvents="none"
+                />
                 {roomLit && <TorchRoomGlow key={`room-light-${square}`} />}
-                <Text style={[styles.squareNumber, locked && styles.lockedRoomNumber, { color: locked ? colors.foreground : colors.boardInk }]}>
+                <Text style={[styles.squareNumber, locked && styles.lockedRoomNumber, { color: locked ? colors.foreground : bullet ? colors.boardSpecialForeground : colors.boardInk }]}>
                   {square}
                 </Text>
                 {keyVisible && (
@@ -641,6 +659,10 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 7,
   },
+  frameGradient: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 25,
+  },
   inner: {
     width: '100%',
     aspectRatio: 1,
@@ -683,12 +705,16 @@ const styles = StyleSheet.create({
     width: '10%',
     height: '10%',
     borderWidth: StyleSheet.hairlineWidth,
+    position: 'relative',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: 2,
     paddingTop: 2,
     paddingBottom: 1,
     overflow: 'hidden',
+  },
+  cellBackground: {
+    ...StyleSheet.absoluteFill,
   },
   targetCell: { borderWidth: 1.5 },
   squareNumber: {
