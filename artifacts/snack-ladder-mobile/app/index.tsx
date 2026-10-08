@@ -14,6 +14,13 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -77,6 +84,8 @@ const ROUNDS_KEY = 'snack-ladder-mobile:saved-rounds:v1';
 const ONLINE_SEAT_KEY = 'snack-ladder-mobile:online-seat:v1';
 const PROFILE_KEY = 'snack-ladder-mobile:profile:v1';
 const LAUNCH_MIN_VISIBLE_MS = 3000;
+const LAUNCH_ARTWORK_SIZE = { width: 1024, height: 1536 } as const;
+const LAUNCH_PROGRESS_BAR = { left: 230, top: 1320, width: 574, height: 31 } as const;
 const PLAYER_COLORS = ['blue', 'coral', 'green', 'purple'] as const;
 const MOVEMENT_STEP_DELAY_MS = 240;
 const SPECIAL_MOVE_DURATION_MS = { ladder: 2280, snake: 2080, web: 1500, knife: 1300 } as const;
@@ -286,20 +295,84 @@ function Field({
   );
 }
 
-function MobileLaunchScreen({ colors }: { colors: ReturnType<typeof useColors> }) {
+function MobileLaunchScreen({
+  colors,
+  reduceMotion,
+}: {
+  colors: ReturnType<typeof useColors>;
+  reduceMotion: boolean;
+}) {
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const progress = useSharedValue(0);
+  const scale = Math.max(
+    viewport.width / LAUNCH_ARTWORK_SIZE.width,
+    viewport.height / LAUNCH_ARTWORK_SIZE.height,
+  );
+  const artworkWidth = LAUNCH_ARTWORK_SIZE.width * scale;
+  const artworkHeight = LAUNCH_ARTWORK_SIZE.height * scale;
+  const cropLeft = (artworkWidth - viewport.width) / 2;
+  const cropTop = (artworkHeight - viewport.height) / 2;
+  const barLeft = LAUNCH_PROGRESS_BAR.left * scale - cropLeft;
+  const barTop = LAUNCH_PROGRESS_BAR.top * scale - cropTop;
+  const barWidth = LAUNCH_PROGRESS_BAR.width * scale;
+  const barHeight = LAUNCH_PROGRESS_BAR.height * scale;
+  const progressStyle = useAnimatedStyle(() => ({
+    width: barWidth * progress.value,
+  }), [barWidth]);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      progress.value = 1;
+      return;
+    }
+    progress.value = 0;
+    progress.value = withTiming(1, {
+      duration: LAUNCH_MIN_VISIBLE_MS,
+      easing: Easing.linear,
+    });
+    return () => cancelAnimation(progress);
+  }, [progress, reduceMotion]);
+
   return (
     <View
       style={[styles.launchScreen, { backgroundColor: colors.background }]}
       accessibilityRole="progressbar"
       accessibilityLabel="Loading Snake and Ladder Adventure"
       testID="launch-loading"
+      onLayout={(event) => {
+        const { width, height } = event.nativeEvent.layout;
+        setViewport((current) => current.width === width && current.height === height ? current : { width, height });
+      }}
     >
       <Image
         source={require('../assets/images/loading-screen.png')}
         accessibilityLabel="Snakes and Ladders Adventure loading artwork"
-        resizeMode="cover"
-        style={styles.launchArtwork}
+        resizeMode="stretch"
+        style={[styles.launchArtwork, { left: -cropLeft, top: -cropTop, width: artworkWidth, height: artworkHeight }]}
       />
+      {barWidth > 0 && barHeight > 0 && (
+        <View
+          pointerEvents="none"
+          style={[styles.launchTrackMask, { left: barLeft, top: barTop, width: barWidth, height: barHeight, borderRadius: barHeight / 2 }]}
+        >
+          <LinearGradient
+            colors={['#0b151a', '#0c1a23', '#0b181f']}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={styles.launchTrackBackground}
+          />
+          <Animated.View
+            style={[styles.launchBarFill, { borderRadius: barHeight / 2 }, progressStyle]}
+          >
+            <LinearGradient
+              colors={['#f7ef94', '#feb102', '#fda100']}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              style={styles.launchBarGradient}
+            />
+          </Animated.View>
+        </View>
+      )}
     </View>
   );
 }
@@ -1219,7 +1292,7 @@ export default function IndexScreen() {
 
   if (!storageReady || !launchMinimumElapsed || online.loadingSession) {
     return (
-      <MobileLaunchScreen colors={colors} />
+      <MobileLaunchScreen colors={colors} reduceMotion={reduceMotion} />
     );
   }
 
@@ -2042,7 +2115,11 @@ export default function IndexScreen() {
  const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#171b2c' },
   launchScreen: { flex: 1, overflow: 'hidden' },
-  launchArtwork: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%' },
+  launchArtwork: { position: 'absolute' },
+  launchTrackMask: { position: 'absolute', overflow: 'hidden' },
+  launchTrackBackground: { flex: 1 },
+  launchBarFill: { position: 'absolute', top: 0, bottom: 0, left: 0, overflow: 'hidden' },
+  launchBarGradient: { flex: 1 },
   homeContent: { paddingHorizontal: 12, gap: 14 },
   gameContent: { paddingHorizontal: 12, gap: 8 },
   homeHeader: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 2 },

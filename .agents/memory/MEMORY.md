@@ -1,4 +1,4 @@
-- [Mobile artifact status](mobile-game-direction.md) — Show supplied mobile loading art for 3 seconds, then resume the saved board; preserve touch input and text-only room chat.
+- [Mobile artifact status](mobile-game-direction.md) — Fill the supplied mobile loading bar from 0–100% over 3 seconds, then resume the saved board.
 - [Torch and crown quest](crown-quest.md) — First arrival at 100 grants a torch and returns the player Home; keys exist only in black rooms 17, 44 and 67.
 - [Extra rolls and mystery powers](mystery-powers.md) — Valid sixes grant another chance; players choose powers, and bomb owners may detonate themselves immediately.
 - [Online multiplayer scope](online-multiplayer.md) — 2–4 people on separate devices; N−1 finishers win, last loses; preserve local saves and original seats.
