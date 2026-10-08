@@ -61,7 +61,7 @@ import {
 import type { RoomSnapshot } from '@workspace/game-core/online';
 import { getMrBotAction, type MrBotAction } from '@/lib/mr-bot';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
-import { GameBoard, MOVEMENT_STEP_DURATION_MS, type BoardBlast, type BoardMotion, type BoardPickupNotice, type BoardShot } from '@/components/GameBoard';
+import { GameBoard, MOVEMENT_STEP_INTERVAL_MS, type BoardBlast, type BoardMotion, type BoardPickupNotice, type BoardShot } from '@/components/GameBoard';
 import { PowerGlyph } from '@/components/PowerGlyph';
 import { PowerInventoryRow } from '@/components/PowerInventoryRow';
 import { useColors } from '@/hooks/useColors';
@@ -87,7 +87,7 @@ const LAUNCH_MIN_VISIBLE_MS = 3000;
 const LAUNCH_ARTWORK_SIZE = { width: 1024, height: 1536 } as const;
 const LAUNCH_PROGRESS_BAR = { left: 230, top: 1320, width: 574, height: 31 } as const;
 const PLAYER_COLORS = ['blue', 'coral', 'green', 'purple'] as const;
-const MOVEMENT_STEP_DELAY_MS = MOVEMENT_STEP_DURATION_MS;
+const MOVEMENT_STEP_DELAY_MS = MOVEMENT_STEP_INTERVAL_MS;
 const SPECIAL_MOVE_DURATION_MS = { ladder: 2280, snake: 2080, web: 1500, knife: 1300 } as const;
 
 type PowerSlot = 'bomb' | 'antiVenom' | 'defuser' | 'webShooter' | 'knife' | 'extraDice';

@@ -35,7 +35,8 @@ export type BoardBlast = {
   victims: { playerId: string; fromSquare: number }[];
 };
 
-export const MOVEMENT_STEP_DURATION_MS = 240;
+export const MOVEMENT_STEP_DURATION_MS = 400;
+export const MOVEMENT_STEP_INTERVAL_MS = 420;
 
 export type BoardMotion = {
   id: number;
