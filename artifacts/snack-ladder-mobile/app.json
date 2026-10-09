@@ -7,11 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "snack-ladder-mobile",
     "userInterfaceStyle": "dark",
-    "splash": {
-      "image": "./assets/images/loading-screen.png",
-      "resizeMode": "cover",
-      "backgroundColor": "#171b2c"
-    },
     "ios": {
       "supportsTablet": false
     },
@@ -21,7 +16,17 @@
     },
     "plugins": [
       "expo-router",
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/loading-screen.png",
+          "imageWidth": 360,
+          "resizeMode": "cover",
+          "backgroundColor": "#171b2c"
+        }
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
