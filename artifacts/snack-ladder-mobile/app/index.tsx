@@ -86,7 +86,6 @@ const ONLINE_SEAT_KEY = 'snack-ladder-mobile:online-seat:v1';
 const PROFILE_KEY = 'snack-ladder-mobile:profile:v1';
 const LAUNCH_ARTWORK_SIZE = { width: 1024, height: 1536 } as const;
 const LAUNCH_PROGRESS_BAR = { left: 230, top: 1320, width: 574, height: 31 } as const;
-const LAUNCH_NATIVE_PROGRESS = 0.53;
 const LAUNCH_STORAGE_READY_PROGRESS = 0.82;
 const PLAYER_COLORS = ['blue', 'coral', 'green', 'purple'] as const;
 const MOVEMENT_STEP_DELAY_MS = MOVEMENT_STEP_INTERVAL_MS;
@@ -309,7 +308,7 @@ function MobileLaunchScreen({
   onProgressComplete: () => void;
 }) {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
-  const progress = useSharedValue(Platform.OS === 'web' ? 0 : LAUNCH_NATIVE_PROGRESS);
+  const progress = useSharedValue(0);
   const scale = Math.max(
     viewport.width / LAUNCH_ARTWORK_SIZE.width,
     viewport.height / LAUNCH_ARTWORK_SIZE.height,
@@ -354,7 +353,7 @@ function MobileLaunchScreen({
       }}
     >
       <Image
-        source={require('../assets/images/loading-screen.png')}
+        source={require('../assets/images/loading-screen-empty.jpg')}
         accessibilityLabel="Snakes and Ladders Adventure loading artwork"
         resizeMode="stretch"
         style={[styles.launchArtwork, { left: -cropLeft, top: -cropTop, width: artworkWidth, height: artworkHeight }]}
@@ -731,8 +730,7 @@ export default function IndexScreen() {
   const launchReady = storageReady && !online.loadingSession && !!game && !!currentPlayer;
   const launchProgressTarget = launchReady
     ? 1
-    : storageReady ? LAUNCH_STORAGE_READY_PROGRESS
-      : Platform.OS === 'web' ? 0 : LAUNCH_NATIVE_PROGRESS;
+    : storageReady ? LAUNCH_STORAGE_READY_PROGRESS : 0;
   const completeLaunchProgress = useCallback(() => setLaunchProgressComplete(true), []);
   useEffect(() => {
     if (!game) {

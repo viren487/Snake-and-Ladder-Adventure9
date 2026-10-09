@@ -20,7 +20,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/loading-screen.png",
+          "image": "./assets/images/loading-screen-empty.jpg",
           "imageWidth": 360,
           "resizeMode": "cover",
           "backgroundColor": "#171b2c"
