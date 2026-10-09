@@ -25,11 +25,11 @@ The user explicitly chose a board-first launch on October 8, 2026. Wait for loca
 
 ## Mobile launch screen
 
-The mobile-only startup uses the user's supplied artwork as its sole splash screen. The yellow bar follows saved-game and online-session readiness, and reaches full only when the board is ready.
+The mobile-only startup uses the user's supplied artwork as its native splash and in-app loader. The yellow bar starts empty, advances with saved-game/session readiness, and reaches full only when the board is ready.
 
 **Why:** On October 9, 2026, the user clarified that the provided splash should replace separate loading screens and that its yellow bar should follow real game/project startup rather than a separate fixed timer.
 
-**How to apply:** Keep native and React startup visually on the same supplied artwork. Advance the bar as storage/session stages actually finish; show 100% and reveal the saved board only when startup is ready. Do not add a second loading indicator or fixed-duration wait.
+**How to apply:** Keep native and React startup visually on the same supplied artwork. Advance the bar as storage/session stages actually finish; show 100% and reveal the saved board only when startup is ready. The native splash is static until JavaScript starts, and Expo Go owns its separate pre-JavaScript bundling screen; project code cannot replace that screen or read Metro bundle percentage. Do not claim that the in-app bar measures bundle bytes, and do not add a second loader or fixed-duration wait.
 
 ## React Native SVG web compatibility
 
