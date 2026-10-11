@@ -35,9 +35,8 @@ export type BoardBlast = {
   victims: { playerId: string; fromSquare: number }[];
 };
 
-// Slightly overlap adjacent room moves so the pawn never pauses at each tile.
-export const MOVEMENT_STEP_DURATION_MS = 430;
-export const MOVEMENT_STEP_INTERVAL_MS = 400;
+export const MOVEMENT_STEP_DURATION_MS = 400;
+export const MOVEMENT_STEP_INTERVAL_MS = 420;
 
 export type BoardMotion = {
   id: number;
@@ -558,12 +557,6 @@ function PandaMotion({
       scaleX = scaleY = interpolate(progress.value, frames, [1, 0.9, 1.13, 1.02, 0.9, 0.72]);
     } else if (effect === 'bamboo') {
       rotate = interpolate(progress.value, [0, 1], [-5, 5]);
-    } else if (effect === 'step') {
-      const frames = [0, 0.38, 0.70, 1];
-      translateY = interpolate(progress.value, frames, [0, -3.2, -1.5, 0]);
-      rotate = interpolate(progress.value, frames, [0, -2, 1.5, 0]);
-      scaleX = interpolate(progress.value, frames, [0.975, 1.03, 0.995, 1]);
-      scaleY = interpolate(progress.value, frames, [1.02, 0.98, 1.015, 1]);
     } else {
       const frames = [0, 0.38, 0.70, 1];
       translateY = interpolate(progress.value, frames, [0, -4.03, -1.86, 0]);
