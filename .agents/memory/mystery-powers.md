@@ -40,12 +40,15 @@ to recognize.
 power log and power-use controls. Let each glyph fill its colored rounded-square
 tile, and keep the power name visible as text.
 
-When a Mystery box opens, show all five powers in the bottom-right area covering
-the board's bottom three rows. Selecting a power reveals GET directly under that
-selected tile; pressing it awards that choice.
+When a Mystery box opens, display five power choices in one row spanning the
+board area marked 44–48, on both web and native mobile. Selecting a power reveals
+a larger GET button directly beneath that tile; pressing it awards that choice.
+Use a red-liquid syringe for Anti-Venom and a web with a hanging spider for Web
+Shooter, rendered as clear game-style vector symbols rather than photos.
 
-**Why:** The user specified the three-row board area and asked for GET to sit
-beneath whichever power is selected.
+**Why:** On 2026-10-11, the user requested the 44–48 board area, larger GET
+controls and syringe/web imagery. This supersedes the earlier bottom-right placement.
 
-**How to apply:** Keep the large tile symbol, text label and selected-only GET button
-together in each tile on both web and native mobile.
+**How to apply:** Keep the same vector glyphs in the chooser, power inventory/log
+and power-use controls. Preserve readable labels and a touchable selected-only
+GET button across web and native mobile.

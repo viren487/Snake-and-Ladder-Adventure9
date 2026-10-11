@@ -31,17 +31,15 @@ export function PowerGlyph({
         </g>
       )}
       {power === 'antiVenom' && (
-        <g strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 15.5c1.1-1.9 3.7-.9 3.3.7-.3 1.1-1.9 1.2-2.5.5-.8 1.8.5 3.4 2.5 2.9" fill="none" stroke="#42a938" strokeWidth="1.8" />
-          <path d="M12 2.7v3.2M8.4 2.7h7.2" stroke="#6e1927" strokeWidth="2" />
-          <g transform="rotate(-45 12 12)">
-            <rect x="8" y="5.8" width="8" height="13.7" rx="1.2" fill="#fff7f3" stroke="#812235" strokeWidth="1.5" />
-            <path d="M9.5 12.4h5v5.5h-5z" fill="#ef4057" stroke="#b51e37" strokeWidth=".8" />
-            <path d="M9.5 11h5m-5 3h5m-5 3h5" stroke="#96243a" strokeWidth=".8" />
-            <path d="M7.2 19.5h9.6" stroke="#812235" strokeWidth="2" />
-            <path d="M9.8 19.5v2l2.2 2 2.2-2v-2" fill="#e8f2ff" stroke="#812235" strokeWidth="1.1" />
-            <path d="M12 23.4v2.8" stroke="#b9e7ff" strokeWidth="1.6" />
-          </g>
+        <g strokeLinecap="round" strokeLinejoin="round" transform="rotate(-43 12 12)">
+          <path d="M12 1.1v3.1" stroke="#f8fbff" strokeWidth="1.5" />
+          <path d="M9.8 4.2h4.4l-.5 1.7h-3.4z" fill="#bdefff" stroke="#254b68" strokeWidth=".8" />
+          <rect x="8.1" y="5.7" width="7.8" height="11.2" rx="1.2" fill="#f1fbff" stroke="#294a61" strokeWidth="1" />
+          <path d="M9.1 10.1h5.8v5.6a.5.5 0 0 1-.5.5H9.6a.5.5 0 0 1-.5-.5z" fill="#f13b5b" />
+          <path d="M9.2 9.4h5.6M9.8 11.1h1.5m2.1 1.6h1.2m-4.8 1.7h1.7" stroke="#a61f3a" strokeWidth=".8" />
+          <path d="M7.2 17h9.6v1.8H7.2z" fill="#bdefff" stroke="#294a61" strokeWidth=".9" />
+          <path d="M10 18.8v2.6h4v-2.6M12 21.4v1.5m-2.6 0h5.2" fill="none" stroke="#294a61" strokeWidth="1.2" />
+          <path d="M12 22.9v.7" stroke="#e5f7ff" strokeWidth="1.2" />
         </g>
       )}
       {power === 'defuser' && (
@@ -65,11 +63,13 @@ export function PowerGlyph({
       )}
       {power === 'webShooter' && (
         <g strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="10.5" cy="12" r="6.1" fill="#102c48" stroke="#8eeaff" strokeWidth="1.5" />
-          <circle cx="10.5" cy="12" r="3.1" fill="#147db0" stroke="#52d8ff" strokeWidth="1" />
-          <path d="M8.7 10.2 12.3 13.8m0-3.6-3.6 3.6m1.8-5v10m-5-5h10" stroke="#e6fbff" strokeWidth=".9" />
-          <path d="m15.8 9.2 4.7-2m-4.2 4.7 5 .2m-5.5 2.3 4.4 2.2m-1.7-8v6.8" stroke="#69dfff" strokeWidth="1.1" />
-          <circle cx="20.5" cy="7" r=".8" fill="#effdff" stroke="none" />
+          <path d="M12 2 20.5 6.7 21.5 13.6 16.7 18.1 7.3 18.1 2.5 13.6 3.5 6.7z" fill="#e8fbff" fillOpacity=".18" stroke="#f1fcff" strokeWidth="1.1" />
+          <path d="M12 2 12 15.6M3.5 6.7 16.7 18.1M20.5 6.7 7.3 18.1M2.5 13.6 21.5 13.6M3.5 6.7 16 8.2 21.5 13.6M20.5 6.7 8 8.2 2.5 13.6" fill="none" stroke="#c8f3ff" strokeWidth=".65" />
+          <path d="M12 2.8c-2.1 1.2-2.1 2.3 0 3.4 2.2 1.1 2.2 2.3 0 3.4-2.1 1.1-2.1 2.3 0 3.4 1.8 1 1.8 1.8.5 2.7" fill="none" stroke="#9cecff" strokeWidth=".7" />
+          <path d="M12.5 18.1v1.1" stroke="#fff" strokeWidth=".9" />
+          <ellipse cx="12.5" cy="20.4" rx="1.5" ry="1.8" fill="#ef4659" stroke="#781b35" strokeWidth=".7" />
+          <circle cx="12.5" cy="18.9" r=".7" fill="#ff9a9e" stroke="#781b35" strokeWidth=".45" />
+          <path d="m11.2 19.7-1-.8m1 2-.9.9m2.9-2.1 1-.8m-1 2 1 .9" stroke="#c92f4d" strokeWidth=".7" />
         </g>
       )}
     </svg>
