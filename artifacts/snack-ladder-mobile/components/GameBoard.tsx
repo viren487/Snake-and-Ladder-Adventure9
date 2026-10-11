@@ -110,8 +110,8 @@ function MysteryPowerTray({
   const colors = useColors();
   const [selected, setSelected] = React.useState<MysteryPowerType | null>(null);
   React.useEffect(() => { setSelected(null); }, [square]);
-  const labelSize = Math.max(7, Math.min(10, boardSize / 44));
-  const iconSize = Math.min(26, Math.max(18, Math.round(boardSize / 14)));
+  const labelSize = Math.max(7, Math.min(10, boardSize / 40));
+  const iconSize = Math.min(30, Math.max(20, Math.round(boardSize / 12)));
   const accents: Record<MysteryPowerType, string> = {
     bomb: '#ffad78',
     antiVenom: '#9cf28c',
@@ -154,10 +154,10 @@ function MysteryPowerTray({
                   accessibilityLabel={`Get ${option.label}`}
                   disabled={!canChoose || busy}
                   onPress={() => onChoose?.(option.power)}
-                  style={[styles.mysteryGetButton, { backgroundColor: colors.primary, height: Math.max(10, labelSize + 3) }]}
+                  style={[styles.mysteryGetButton, { backgroundColor: colors.primary, height: Math.max(22, labelSize + 12) }]}
                   testID="get-mystery-power"
                 >
-                  <Text style={[styles.mysteryGetLabel, { color: colors.primaryForeground, fontSize: Math.max(6.5, labelSize - 1) }]}>GET</Text>
+                  <Text style={[styles.mysteryGetLabel, { color: colors.primaryForeground, fontSize: Math.max(8, labelSize) }]}>GET</Text>
                 </Pressable>
               )}
             </View>
@@ -1374,16 +1374,16 @@ const styles = StyleSheet.create({
   homeBadgeText: { color: '#fff7d3', fontFamily: 'Fredoka_600SemiBold', fontSize: 8, letterSpacing: 0.8, textShadowColor: '#6d2c10', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1 },
   mysteryTray: {
     position: 'absolute',
-    left: '50%',
-    top: '70%',
+    left: '30%',
+    top: '42.5%',
     width: '50%',
-    height: '30%',
+    height: '25%',
     zIndex: 30,
-    padding: 3,
+    padding: 4,
     borderWidth: 1,
     borderRadius: 8,
     justifyContent: 'flex-start',
-    gap: 2,
+    gap: 3,
     overflow: 'hidden',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.3,
@@ -1391,12 +1391,12 @@ const styles = StyleSheet.create({
     elevation: 9,
   },
   mysteryTrayTitle: { fontFamily: 'Nunito_700Bold', fontSize: 8, lineHeight: 10, textAlign: 'center', letterSpacing: 0.35 },
-  mysteryPowerGrid: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'space-between', justifyContent: 'space-around', gap: 2 },
-  mysteryPowerSlot: { width: '32%', height: '48%', minWidth: 0, alignItems: 'stretch', justifyContent: 'flex-start', gap: 1 },
+  mysteryPowerGrid: { flex: 1, flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'stretch', justifyContent: 'space-between', gap: 2 },
+  mysteryPowerSlot: { width: '19%', height: '100%', minWidth: 0, alignItems: 'stretch', justifyContent: 'flex-start', gap: 3 },
   mysteryPowerOption: { flex: 1, width: '100%', minHeight: 0, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 6, paddingHorizontal: 1, gap: 0, overflow: 'hidden' },
   mysteryPowerLabel: { fontFamily: 'Nunito_700Bold', fontSize: 6.5, lineHeight: 8, textAlign: 'center', flexShrink: 1 },
-  mysteryGetButton: { width: '100%', minHeight: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 5, paddingHorizontal: 2 },
-  mysteryGetLabel: { fontFamily: 'Nunito_700Bold', fontSize: 7, lineHeight: 9 },
+  mysteryGetButton: { width: '100%', minHeight: 22, alignItems: 'center', justifyContent: 'center', borderRadius: 5, paddingHorizontal: 2 },
+  mysteryGetLabel: { fontFamily: 'Nunito_700Bold', fontSize: 8, lineHeight: 10 },
   grid: {
     ...StyleSheet.absoluteFill,
     flexDirection: 'row',

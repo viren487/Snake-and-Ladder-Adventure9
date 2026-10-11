@@ -19,15 +19,14 @@ export function PowerGlyph({ power, size = 20 }: { power: DetailedPower; size?: 
       )}
       {power === 'antiVenom' && (
         <>
-          <Path d="M3 15.5c1.1-1.9 3.7-.9 3.3.7-.3 1.1-1.9 1.2-2.5.5-.8 1.8.5 3.4 2.5 2.9" fill="none" stroke="#42a938" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-          <Path d="M12 2.7v3.2M8.4 2.7h7.2" stroke="#6e1927" strokeWidth={2} strokeLinecap="round" />
-          <G transform="rotate(-45 12 12)">
-            <Path d="M8 5.8h8v13.7a1.2 1.2 0 0 1-1.2 1.2h-5.6A1.2 1.2 0 0 1 8 19.5z" fill="#fff7f3" stroke="#812235" strokeWidth={1.5} strokeLinejoin="round" />
-            <Path d="M9.5 12.4h5v5.5h-5z" fill="#ef4057" stroke="#b51e37" strokeWidth={0.8} />
-            <Path d="M9.5 11h5m-5 3h5m-5 3h5" stroke="#96243a" strokeWidth={0.8} />
-            <Path d="M7.2 19.5h9.6" stroke="#812235" strokeWidth={2} />
-            <Path d="M9.8 19.5v2l2.2 2 2.2-2v-2" fill="#e8f2ff" stroke="#812235" strokeWidth={1.1} />
-            <Path d="M12 23.4v2.8" stroke="#b9e7ff" strokeWidth={1.6} />
+          <G transform="rotate(-43 12 12)" strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M12 1.1v3.1" stroke="#f8fbff" strokeWidth={1.5} />
+            <Path d="M9.8 4.2h4.4l-.5 1.7h-3.4z" fill="#bdefff" stroke="#254b68" strokeWidth={0.8} />
+            <Path d="M8.1 6.9A1.2 1.2 0 0 1 9.3 5.7h5.4a1.2 1.2 0 0 1 1.2 1.2v8.8a1.2 1.2 0 0 1-1.2 1.2H9.3a1.2 1.2 0 0 1-1.2-1.2z" fill="#f1fbff" stroke="#294a61" strokeWidth={1} />
+            <Path d="M9.1 10.1h5.8v5.1a1 1 0 0 1-1 1H10.1a1 1 0 0 1-1-1z" fill="#f13b5b" />
+            <Path d="M9.2 9.4h5.6M9.8 11.1h1.5m2.1 1.6h1.2m-4.8 1.7h1.7" stroke="#a61f3a" strokeWidth={0.8} />
+            <Path d="M7.2 17h9.6v1.8H7.2z" fill="#bdefff" stroke="#294a61" strokeWidth={0.9} />
+            <Path d="M10 18.8v2.6h4v-2.6M12 21.4v1.5m-2.6 0h5.2M12 22.9v.7" fill="none" stroke="#294a61" strokeWidth={1.2} />
           </G>
         </>
       )}
@@ -50,11 +49,15 @@ export function PowerGlyph({ power, size = 20 }: { power: DetailedPower; size?: 
       )}
       {power === 'webShooter' && (
         <>
-          <Circle cx={10.5} cy={12} r={6.1} fill="#102c48" stroke="#8eeaff" strokeWidth={1.5} />
-          <Circle cx={10.5} cy={12} r={3.1} fill="#147db0" stroke="#52d8ff" strokeWidth={1} />
-          <Path d="M8.7 10.2 12.3 13.8m0-3.6-3.6 3.6m1.8-5v10m-5-5h10" stroke="#e6fbff" strokeWidth={0.9} strokeLinecap="round" />
-          <Path d="m15.8 9.2 4.7-2m-4.2 4.7 5 .2m-5.5 2.3 4.4 2.2m-1.7-8v6.8" stroke="#69dfff" strokeWidth={1.1} strokeLinecap="round" />
-          <Circle cx={20.5} cy={7} r={0.8} fill="#effdff" />
+          <G strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M12 2 20.5 6.7 21.5 13.6 16.7 18.1 7.3 18.1 2.5 13.6 3.5 6.7z" fill="#e8fbff" fillOpacity={0.18} stroke="#f1fcff" strokeWidth={1.1} />
+            <Path d="M12 2 12 15.6M3.5 6.7 16.7 18.1M20.5 6.7 7.3 18.1M2.5 13.6 21.5 13.6M3.5 6.7 16 8.2 21.5 13.6M20.5 6.7 8 8.2 2.5 13.6" fill="none" stroke="#c8f3ff" strokeWidth={0.65} />
+            <Path d="M12 2.8c-2.1 1.2-2.1 2.3 0 3.4 2.2 1.1 2.2 2.3 0 3.4-2.1 1.1-2.1 2.3 0 3.4 1.8 1 1.8 1.8.5 2.7" fill="none" stroke="#9cecff" strokeWidth={0.7} />
+            <Path d="M12.5 18.1v1.1" stroke="#fff" strokeWidth={0.9} />
+            <Circle cx={12.5} cy={20.4} r={1.5} fill="#ef4659" stroke="#781b35" strokeWidth={0.7} />
+            <Circle cx={12.5} cy={18.9} r={0.7} fill="#ff9a9e" stroke="#781b35" strokeWidth={0.45} />
+            <Path d="m11.2 19.7-1-.8m1 2-.9.9m2.9-2.1 1-.8m-1 2 1 .9" stroke="#c92f4d" strokeWidth={0.7} />
+          </G>
         </>
       )}
     </Svg>
