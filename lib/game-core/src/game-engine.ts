@@ -1,4 +1,4 @@
-import { cloneGame, emptyPowers, finishTurn, MYSTERY_BOX_SQUARES, resolveDefenseWith,
+import { cloneGame, emptyPowers, finishTurn, KEY_ROOM_SQUARES, MYSTERY_BOX_SQUARES, resolveDefenseWith,
   type PowerInventory, type PlantedBomb, type PowerChoice } from "./powers.ts";
 export { choosePower, plantBomb, detonateBomb, useExtraDice, useWebShooter, useKnife, isValidPowerState, MYSTERY_BOX_SQUARES, MYSTERY_POWER_TYPES, POWER_TYPES } from "./powers.ts";
 export type { PowerType, MysteryPowerType } from "./powers.ts";
@@ -52,14 +52,16 @@ export const LADDERS = [
   { from: 74, to: 87 },
 ] as const;
 
-export const KEY_SQUARES = [17, 44, 67] as const;
+export const KEY_SQUARES = KEY_ROOM_SQUARES;
+export const BLACK_ROOM_SQUARES = KEY_SQUARES;
 export const EXTRA_BULLET_SQUARES = [61, 77] as const;
 export const BULLET_PICKUP_SQUARES = [6, 12, 25, 38, 63, 89, ...EXTRA_BULLET_SQUARES] as const;
 export const BOOM_SQUARE = 97 as const;
-export const LOCKED_SQUARES = [17, 44, 67] as const;
+export const LOCKED_SQUARES = KEY_SQUARES;
 export const GUN_SQUARES = [94, 95, 96] as const;
 export const SHOOTABLE_SNAKE_SQUARES = [98, 99] as const;
 export type ShootableSnakeSquare = (typeof SHOOTABLE_SNAKE_SQUARES)[number];
+export type ShotTarget = ShootableSnakeSquare | "self";
 export const MAX_BULLETS = 5;
 export const SNAKE_STUN_ROLLS = 3;
 
@@ -154,7 +156,7 @@ export function repairLegacyGame(state: GameState): GameState {
     message: state.pendingFireForPlayerId && !validPendingShot
       ? `${state.players[nextPlayerIndex].name} is up next. Fire is available only from a gun room.`
       : legacyQuest
-        ? "Torch quest: first reach 100 for a torch, then land in black room 17, 44 or 67 for one key, and return to 100 for the crown. Previous ammo-room keys are not crown keys."
+        ? "Torch quest: first reach 100 for a torch, then land in black room 17, 34, 44 or 67 for one key, and return to 100 for the crown. Previous ammo-room keys are not crown keys."
         : state.message,
     pendingFireForPlayerId: validPendingShot ? state.pendingFireForPlayerId : null,
   };
@@ -278,11 +280,11 @@ function completeLanding(next: GameState, skipBomb = false): TurnResolution {
         movingPlayer.hasTorch = true;
         movingPlayer.position = 0;
         effect = "torch";
-        message = `${movingPlayer.name} collected the torch at 100 and returned Home! The crown is still locked. Land in black room 17, 44 or 67 for one key.`;
+        message = `${movingPlayer.name} collected the torch at 100 and returned Home! The crown is still locked. Land in black room 17, 34, 44 or 67 for one key.`;
       } else {
         movingPlayer.position = 0;
         effect = "return";
-        message = `${movingPlayer.name} reached 100 without a black-room key. The crown remains locked; return Home and try for a key in 17, 44 or 67.`;
+        message = `${movingPlayer.name} reached 100 without a black-room key. The crown remains locked; return Home and try for a key in 17, 34, 44 or 67.`;
       }
     }
   next.bombs.forEach((bomb) => { if (bomb.ownerId !== movingPlayer.id) bomb.armed = bomb.square === movingPlayer.position; });
@@ -292,15 +294,12 @@ function completeLanding(next: GameState, skipBomb = false): TurnResolution {
     next.message += " Choose one mystery power.";
   }
   const reachedGun = (GUN_SQUARES as readonly number[]).includes(movingPlayer.position);
-  const canShootAnySnake = SHOOTABLE_SNAKE_SQUARES.some(
-    (snakeSquare) => movingPlayer.snakeStuns[snakeSquare] === 0,
-  );
   next.pendingFireForPlayerId =
-    next.winnerId === null && reachedGun && movingPlayer.bullets > 0 && canShootAnySnake
+    next.winnerId === null && reachedGun && movingPlayer.bullets > 0
       ? movingPlayer.id
       : null;
   if (next.pendingFireForPlayerId) {
-    next.message = `${movingPlayer.name} stopped in a gun room. Aim at snake 98, 99, or both with two bullets, or pass.`;
+    next.message = `${movingPlayer.name} stopped in a gun room. Aim at snake 98, 99, both with two bullets, or yourself to return Home; or pass.`;
   }
   return { state: finishTurn(next), path: [], effect };
 }
@@ -325,15 +324,19 @@ function requirePendingShooter(state: GameState): [number, Player] {
 }
 
 /** Spend one bullet per target and protect the shooter for their next three rolls. */
-export function shootSnakes(state: GameState, snakeSquares: readonly ShootableSnakeSquare[]): GameState {
-  if (snakeSquares.length < 1 || snakeSquares.length > 2 ||
-    new Set(snakeSquares).size !== snakeSquares.length ||
-    snakeSquares.some((square) => !(SHOOTABLE_SNAKE_SQUARES as readonly number[]).includes(square))) {
-    throw new RangeError("Aim at snake 98, snake 99, or both once each.");
+export function shootSnakes(state: GameState, targets: readonly ShotTarget[]): GameState {
+  if (new Set(targets).size !== targets.length) {
+    throw new RangeError("Aim at each snake once each.");
+  }
+  if (targets.length < 1 || targets.length > 2 ||
+    targets.some((target) => target !== "self" && !(SHOOTABLE_SNAKE_SQUARES as readonly number[]).includes(target)) ||
+    targets.includes("self") && targets.length > 1) {
+    throw new RangeError("Aim at yourself, snake 98, snake 99, or both snakes.");
   }
   const [playerIndex, shooter] = requirePendingShooter(state);
-  if (shooter.bullets < snakeSquares.length) throw new Error("You need one bullet per target.");
-  if (snakeSquares.some((square) => shooter.snakeStuns[square] > 0)) {
+  if (shooter.bullets < targets.length) throw new Error("You need one bullet per target.");
+  const snakeTargets = targets.filter((target): target is ShootableSnakeSquare => target !== "self");
+  if (snakeTargets.some((square) => shooter.snakeStuns[square] > 0)) {
     throw new Error("That snake is already stunned.");
   }
 
@@ -342,14 +345,17 @@ export function shootSnakes(state: GameState, snakeSquares: readonly ShootableSn
     snakeStuns: { ...emptySnakeStuns(), ...player.snakeStuns },
   })) as [Player, Player];
   const firingPlayer = players[playerIndex];
-  firingPlayer.bullets -= snakeSquares.length;
-  for (const square of snakeSquares) firingPlayer.snakeStuns[square] = SNAKE_STUN_ROLLS;
+  firingPlayer.bullets -= targets.length;
+  for (const square of snakeTargets) firingPlayer.snakeStuns[square] = SNAKE_STUN_ROLLS;
+  if (targets.includes("self")) firingPlayer.position = 0;
   return finishTurn({
     ...state,
     players,
     currentPlayerIndex: playerIndex,
     pendingFireForPlayerId: null,
-    message: `${firingPlayer.name} stunned ${snakeSquares.length === 2 ? "both snakes at 98 and 99" : `the snake at ${snakeSquares[0]}`} for their next ${SNAKE_STUN_ROLLS} rolls, using ${snakeSquares.length} bullet${snakeSquares.length === 1 ? "" : "s"}.`,
+    message: targets.includes("self")
+      ? `${firingPlayer.name} fired at themself and returned Home, keeping their torch, key and other powers.`
+      : `${firingPlayer.name} stunned ${snakeTargets.length === 2 ? "both snakes at 98 and 99" : `the snake at ${snakeTargets[0]}`} for their next ${SNAKE_STUN_ROLLS} rolls, using ${targets.length} bullet${targets.length === 1 ? "" : "s"}.`,
   });
 }
 

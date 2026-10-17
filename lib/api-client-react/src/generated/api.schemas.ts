@@ -86,6 +86,10 @@ export const OnlineRoomEventEffect = {
   knife: 'knife',
 } as const;
 
+export const OnlineRoomEventTargetsItem = {  NUMBER_98: 98,
+  NUMBER_99: 99,
+  self: 'self',
+} as const
 /**
  * @nullable
  */
@@ -104,7 +108,7 @@ export type OnlineRoomEvent = {
   path: number[];
   /** @nullable */
   effect: OnlineRoomEventEffect;
-  targets: number[];
+  targets: typeof OnlineRoomEventTargetsItem[keyof typeof OnlineRoomEventTargetsItem][];
 } | null;
 
 export interface RoomChatMessage {
@@ -196,14 +200,10 @@ export const RoomActionPower = {
   knife: 'knife',
 } as const;
 
-export type RoomActionTargetsItem = typeof RoomActionTargetsItem[keyof typeof RoomActionTargetsItem];
-
-
-export const RoomActionTargetsItem = {
-  NUMBER_98: 98,
+export const RoomActionTargetsItem = {  NUMBER_98: 98,
   NUMBER_99: 99,
-} as const;
-
+  self: 'self',
+} as const
 export interface RoomAction {
   type: RoomActionType;
   /**
@@ -231,7 +231,7 @@ export interface RoomAction {
      * @minItems 1
      * @maxItems 2
      */
-  targets?: RoomActionTargetsItem[];
+  targets?: typeof RoomActionTargetsItem[keyof typeof RoomActionTargetsItem][];
 }
 
 export type RoomCommunicationInputType = typeof RoomCommunicationInputType[keyof typeof RoomCommunicationInputType];

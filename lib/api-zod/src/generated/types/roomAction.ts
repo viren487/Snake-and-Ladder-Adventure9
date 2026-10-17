@@ -36,5 +36,5 @@ export interface RoomAction {
      * @minItems 1
      * @maxItems 2
      */
-  targets?: RoomActionTargetsItem[];
+  targets?: typeof RoomActionTargetsItem[keyof typeof RoomActionTargetsItem][];
 }

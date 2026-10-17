@@ -1,4 +1,4 @@
-import type { GameState, TurnResolution } from "./game-engine.ts";
+import type { GameState, ShotTarget, TurnResolution } from "./game-engine.ts";
 
 export type RoomSession = { code: string; token: string; playerId: string };
 export type RoomChatMessage = {
@@ -28,7 +28,7 @@ export type RoomEvent = {
   roll: number | null;
   path: number[];
   effect: TurnResolution["effect"];
-  targets: number[];
+  targets: ShotTarget[];
   sourcePlayerId?: string;
   sourcePosition?: number;
 };

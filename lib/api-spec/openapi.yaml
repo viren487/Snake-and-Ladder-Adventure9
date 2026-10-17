@@ -166,7 +166,12 @@ components:
           type: array
           minItems: 1
           maxItems: 2
-          items: { type: integer, enum: [98, 99] }
+          items:
+            oneOf:
+              - type: integer
+                enum: [98, 99]
+              - type: string
+                enum: [self]
     RoomCommunicationInput:
       type: object
       required: [type]
@@ -220,7 +225,14 @@ components:
         roll: { type: ["integer", "null"] }
         path: { type: array, items: { type: integer } }
         effect: { type: ["string", "null"], enum: [snake, ladder, boom, torch, return, web, knife, null] }
-        targets: { type: array, items: { type: integer } }
+        targets:
+          type: array
+          items:
+            oneOf:
+              - type: integer
+                enum: [98, 99]
+              - type: string
+                enum: [self]
     OnlineRoom:
       type: object
       required: [code, status, version, game, members, maxPlayers, yourPlayerId, rematchVotes, event, busyForMs, chatMessages, voiceSignals]
