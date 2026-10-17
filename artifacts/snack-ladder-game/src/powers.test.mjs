@@ -26,7 +26,7 @@ for (const [name, engine] of [["web", web]]) {
   });
   test(`${name}: all mystery rooms offer five powers, without Extra Dice`, () => {
     assert.deepEqual(engine.MYSTERY_POWER_TYPES, ["bomb", "antiVenom", "defuser", "webShooter", "knife"]);
-    for (const square of [14, 35, 51, 76]) {
+    for (const square of [14, 23, 35, 41, 51, 76]) {
       for (const power of engine.MYSTERY_POWER_TYPES) {
         let game = engine.playTurn(at(square - 1), 1);
         assert.equal(game.pendingChoice.kind, "mystery");

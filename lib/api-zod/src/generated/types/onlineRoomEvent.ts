@@ -7,6 +7,7 @@
  */
 import type { OnlineRoomEventEffect } from './onlineRoomEventEffect';
 import type { OnlineRoomEventKind } from './onlineRoomEventKind';
+import type { OnlineRoomEventTargetsItem } from './onlineRoomEventTargetsItem';
 
 /**
  * @nullable
@@ -26,5 +27,5 @@ export type OnlineRoomEvent = {
   path: number[];
   /** @nullable */
   effect: OnlineRoomEventEffect;
-  targets: number[];
+  targets: typeof OnlineRoomEventTargetsItem[keyof typeof OnlineRoomEventTargetsItem][];
 } | null;

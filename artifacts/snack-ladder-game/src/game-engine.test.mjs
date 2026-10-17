@@ -6,6 +6,7 @@ import {
   MYSTERY_POWER_TYPES,
   MAX_BULLETS,
   KEY_SQUARES,
+  BLACK_ROOM_SQUARES,
   passFire,
   playTurn,
   repairLegacyGame,
@@ -24,7 +25,15 @@ function at(position, keys = 0) {
 }
 
 test("keys exist only in black rooms, after torch collection and on exact landing", () => {
-  assert.deepEqual(KEY_SQUARES, [17, 44, 67]);
+  assert.deepEqual(BLACK_ROOM_SQUARES, [17, 34, 44, 67]);
+  assert.deepEqual(KEY_SQUARES, [17, 34, 44, 67]);
+  const newBlackRoom = playTurn(at(33), 1);
+  assert.equal(newBlackRoom.players[0].keys, 0); // Still dark without the torch.
+  assert.equal(newBlackRoom.players[0].crownKeyRoom, null);
+  const litRoom34 = at(33);
+  litRoom34.players[0].hasTorch = true;
+  const room34Key = playTurn(litRoom34, 1);
+  assert.equal(room34Key.players[0].crownKeyRoom, 34);
   for (const room of KEY_SQUARES) {
     assert.equal(playTurn(at(room - 1), 1).players[0].keys, 0);
     const lit = at(room - 1);
@@ -237,6 +246,22 @@ test("one bullet allows one snake; aiming at both costs two bullets", () => {
   assert.equal(both.pendingFireForPlayerId, null);
   assert.equal(both.currentPlayerIndex, 1);
   assert.throws(() => shootSnakes(bothChoice, [98, 98]), /once each/);
+});
+
+test("self-shot returns the shooter Home, preserves their quest, and costs one bullet", () => {
+  const game = at(93);
+  game.players[0].bullets = 1;
+  game.players[0].hasTorch = true;
+  game.players[0].powers.antiVenom = 1;
+  const waiting = resolveTurn(game, 1).state;
+  waiting.players[0].snakeStuns = { 98: 2, 99: 2 };
+  const home = shootSnakes(waiting, ["self"]);
+  assert.equal(home.players[0].position, 0);
+  assert.equal(home.players[0].bullets, 0);
+  assert.equal(home.players[0].hasTorch, true);
+  assert.equal(home.players[0].powers.antiVenom, 1);
+  assert.deepEqual(home.players[0].snakeStuns, { 98: 2, 99: 2 });
+  assert.throws(() => shootSnakes(waiting, ["self", 98]), /Aim at yourself/);
 });
 
 test("a shot protects only its shooter for the next three of their dice rolls", () => {

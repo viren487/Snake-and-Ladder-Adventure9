@@ -256,7 +256,7 @@ export function applyRoomAction(room: StoredRoom, member: Member, action: RoomAc
       }
       case "shoot":
         event.targets = action.targets ?? [];
-        room.game = shootSnakes(room.game, event.targets as (98 | 99)[]); break;
+        room.game = shootSnakes(room.game, event.targets as ("self" | 98 | 99)[]); break;
       case "pass": room.game = passFire(room.game); break;
     }
     if (room.game.winnerId) room.status = "finished";

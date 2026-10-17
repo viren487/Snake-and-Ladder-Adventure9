@@ -6,10 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type RoomActionTargetsItem = typeof RoomActionTargetsItem[keyof typeof RoomActionTargetsItem];
-
-
-export const RoomActionTargetsItem = {
-  NUMBER_98: 98,
+export const RoomActionTargetsItem = {  NUMBER_98: 98,
   NUMBER_99: 99,
-} as const;
+  self: 'self',
+} as const

@@ -24,8 +24,8 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import type { GameState, MysteryPowerType, ShootableSnakeSquare } from '@workspace/game-core';
-import { BOOM_SQUARE, BULLET_PICKUP_SQUARES, GUN_SQUARES, KEY_SQUARES, LADDERS, MYSTERY_BOX_SQUARES, SNAKES, SHOOTABLE_SNAKE_SQUARES, squareAt } from '@workspace/game-core';
+import type { GameState, MysteryPowerType, ShootableSnakeSquare, ShotTarget } from '@workspace/game-core';
+import { BLACK_ROOM_SQUARES, BOOM_SQUARE, BULLET_PICKUP_SQUARES, GUN_SQUARES, KEY_SQUARES, LADDERS, MYSTERY_BOX_SQUARES, SNAKES, SHOOTABLE_SNAKE_SQUARES, squareAt } from '@workspace/game-core';
 import { useColors } from '@/hooks/useColors';
 import { PowerGlyph } from '@/components/PowerGlyph';
 
@@ -48,7 +48,7 @@ export type BoardMotion = {
   carriedItem?: 'torch' | 'key' | null;
 };
 
-export type BoardShot = { id: number; from: number; targets: readonly ShootableSnakeSquare[] };
+export type BoardShot = { id: number; from: number; targets: readonly ShotTarget[] };
 export type BoardPickupNotice = { id: number; kind: 'torch' | 'key'; playerName: string; room?: number };
 
 type Props = {
@@ -57,7 +57,7 @@ type Props = {
   shot?: BoardShot | null;
   firing?: boolean;
   pickupNotice?: BoardPickupNotice | null;
-  selectedTargets?: readonly ShootableSnakeSquare[];
+  selectedTargets?: readonly ShotTarget[];
   onSelectTarget?: (square: ShootableSnakeSquare) => void;
   bombBlast?: BoardBlast | null;
   mysterySquare?: number | null;
@@ -664,13 +664,13 @@ function ShotProjectile({
   progress,
   shotId,
 }: {
-  target: ShootableSnakeSquare;
+  target: ShotTarget;
   source: { x: number; y: number };
   boardSize: number;
   progress: SharedValue<number>;
   shotId: number;
 }) {
-  const point = centerForSquare(target);
+  const point = target === 'self' ? source : centerForSquare(target);
   const projectileStyle = useAnimatedStyle(() => ({
     opacity: interpolate(progress.value, [0, 0.08, 0.82, 1], [0, 1, 1, 0]),
     transform: [
@@ -704,7 +704,7 @@ function ShotAnimation({ shot, boardSize, firing }: { shot: BoardShot; boardSize
     <>
       <Svg style={StyleSheet.absoluteFill} viewBox="0 0 1000 1000" pointerEvents="none" aria-hidden={true}>
         {shot.targets.map((target) => {
-          const point = centerForSquare(target);
+          const point = target === 'self' ? source : centerForSquare(target);
           return (
             <React.Fragment key={target}>
               <Path d={`M ${source.x} ${source.y} L ${point.x} ${point.y}`} stroke="#201323" strokeWidth={22} opacity={0.72} />
@@ -999,6 +999,7 @@ function BombBlastVisual({ blast }: { blast: BoardBlast }) {
         <BlastRing progress={progress} delay={0.16} color={colors.primary} />
         <BlastRing progress={progress} delay={0.31} color={colors.foreground} />
         <Animated.View style={[styles.blastCore, { backgroundColor: colors.destructive }, coreStyle]} />
+        <Text style={styles.blastLabel}>BOMB</Text>
       </View>
     </>
   );
@@ -1124,7 +1125,8 @@ export function GameBoard({
       >
         <View style={styles.grid}>
           {cells.map(({ row, column, square }) => {
-            const locked = (KEY_SQUARES as readonly number[]).includes(square);
+            const locked = (BLACK_ROOM_SQUARES as readonly number[]).includes(square);
+            const keyRoom = (KEY_SQUARES as readonly number[]).includes(square);
             const feature = tileFeature(square);
             const bullet = feature === 'bullet';
             const tone: [string, string, string] = locked
@@ -1143,7 +1145,7 @@ export function GameBoard({
             const targetAvailable = isSnakeTarget && game.players[game.currentPlayerIndex]?.snakeStuns[square as ShootableSnakeSquare] === 0;
             const accessibleTarget = targetAvailable && !!onSelectTarget;
             const selected = selectedTargets.includes(square as ShootableSnakeSquare);
-            const roomCarrier = locked
+            const roomCarrier = keyRoom
               ? game.players.find((player) =>
                 (player.hasTorch || player.crownKeyRoom === square) && player.position === square
               )
@@ -1154,7 +1156,7 @@ export function GameBoard({
               <Pressable
                 key={square}
                 accessibilityRole={accessibleTarget ? 'button' : undefined}
-                accessibilityLabel={accessibleTarget ? `Aim at snake ${square}${selected ? ', selected' : ''}` : `Square ${square}${feature ? `, ${TILE_FEATURE_LABELS[feature]}` : ''}${locked ? roomLit ? keyVisible ? ', torch-lit; key revealed' : roomCarrier?.crownKeyRoom === square ? ', black room remains lit after key pickup' : ', black room lit by torch' : ', black room; number visible' : ''}`}
+                accessibilityLabel={accessibleTarget ? `Aim at snake ${square}${selected ? ', selected' : ''}` : `Square ${square}${feature ? `, ${TILE_FEATURE_LABELS[feature]}` : ''}${locked ? keyRoom ? roomLit ? keyVisible ? ', torch-lit; key revealed' : roomCarrier?.crownKeyRoom === square ? ', black room remains lit after key pickup' : ', black room lit by torch' : ', black room; number visible' : '' : ''}`}
                 accessibilityState={accessibleTarget ? { selected } : undefined}
                 disabled={!accessibleTarget}
                 onPress={() => onSelectTarget?.(square as ShootableSnakeSquare)}
@@ -1612,6 +1614,19 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 2,
     borderColor: '#fff4d2',
+  },
+  blastLabel: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -19 }, { translateY: -7 }],
+    color: '#fff9dc',
+    fontFamily: 'Fredoka_700Bold',
+    fontSize: 10,
+    letterSpacing: 0.4,
+    textShadowColor: '#9b241f',
+    textShadowRadius: 3,
+    zIndex: 2,
   },
   tokenWrap: { width: 28, height: 31, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   carriedItem: {

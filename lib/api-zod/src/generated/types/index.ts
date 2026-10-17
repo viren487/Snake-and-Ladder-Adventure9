@@ -12,6 +12,7 @@ export * from './onlineRoom';
 export * from './onlineRoomEvent';
 export * from './onlineRoomEventEffect';
 export * from './onlineRoomEventKind';
+export * from './onlineRoomEventTargetsItem';
 export * from './onlineRoomGame';
 export * from './onlineRoomMember';
 export * from './onlineRoomStatus';

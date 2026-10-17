@@ -1,4 +1,4 @@
-.celebration-root{margin:16px auto 0;max-width:720px;padding:14px 10px 16px;border-radius:18px;background:#fff3cf;border:3px solid #f3bd42;color:#3d2a17;text-align:center;box-sizing:border-box}
+.celebration-root{position:absolute;inset:0;z-index:60;display:grid;align-content:center;justify-items:center;margin:0;padding:12px;max-width:none;border-radius:8px;background:#09101bc9;border:0;color:#3d2a17;text-align:center;box-sizing:border-box}
 .celebration-title{margin:0 0 8px;font-size:1.4rem;font-weight:800}
 .celebration-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .celebration-row{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:10px}

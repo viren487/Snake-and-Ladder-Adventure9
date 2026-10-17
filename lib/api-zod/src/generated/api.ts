@@ -73,7 +73,7 @@ export const CreateGameRoomResponse = zod.object({
   "roll": zod.number().int().nullable(),
   "path": zod.array(zod.number().int()),
   "effect": zod.union([zod.literal('snake'),zod.literal('ladder'),zod.literal('boom'),zod.literal('torch'),zod.literal('return'),zod.literal('web'),zod.literal('knife'),zod.literal(null)]).nullable(),
-  "targets": zod.array(zod.number().int())
+  "targets": zod.array(zod.union([zod.union([zod.literal(98),zod.literal(99)]),zod.enum(['self'])]))
 }).nullable(),
   "busyForMs": zod.number().int().min(createGameRoomResponseRoomBusyForMsMin),
   "chatMessages": zod.array(zod.object({
@@ -155,7 +155,7 @@ export const JoinGameRoomResponse = zod.object({
   "roll": zod.number().int().nullable(),
   "path": zod.array(zod.number().int()),
   "effect": zod.union([zod.literal('snake'),zod.literal('ladder'),zod.literal('boom'),zod.literal('torch'),zod.literal('return'),zod.literal('web'),zod.literal('knife'),zod.literal(null)]).nullable(),
-  "targets": zod.array(zod.number().int())
+  "targets": zod.array(zod.union([zod.union([zod.literal(98),zod.literal(99)]),zod.enum(['self'])]))
 }).nullable(),
   "busyForMs": zod.number().int().min(joinGameRoomResponseRoomBusyForMsMin),
   "chatMessages": zod.array(zod.object({
@@ -218,7 +218,7 @@ export const GetGameRoomResponse = zod.object({
   "roll": zod.number().int().nullable(),
   "path": zod.array(zod.number().int()),
   "effect": zod.union([zod.literal('snake'),zod.literal('ladder'),zod.literal('boom'),zod.literal('torch'),zod.literal('return'),zod.literal('web'),zod.literal('knife'),zod.literal(null)]).nullable(),
-  "targets": zod.array(zod.number().int())
+  "targets": zod.array(zod.union([zod.union([zod.literal(98),zod.literal(99)]),zod.enum(['self'])]))
 }).nullable(),
   "busyForMs": zod.number().int().min(getGameRoomResponseBusyForMsMin),
   "chatMessages": zod.array(zod.object({
@@ -268,7 +268,7 @@ export const ActInGameRoomBody = zod.object({
   "bombId": zod.string().max(actInGameRoomBodyBombIdMax).optional(),
   "targetPlayerId": zod.string().min(1).max(actInGameRoomBodyTargetPlayerIdMax).optional(),
   "use": zod.boolean().optional(),
-  "targets": zod.array(zod.union([zod.literal(98),zod.literal(99)])).min(1).max(actInGameRoomBodyTargetsMax).optional()
+  "targets": zod.array(zod.union([zod.union([zod.literal(98),zod.literal(99)]),zod.enum(['self'])])).min(1).max(actInGameRoomBodyTargetsMax).optional()
 })
 
 export const actInGameRoomResponseMaxPlayersMin = 2;
@@ -307,7 +307,7 @@ export const ActInGameRoomResponse = zod.object({
   "roll": zod.number().int().nullable(),
   "path": zod.array(zod.number().int()),
   "effect": zod.union([zod.literal('snake'),zod.literal('ladder'),zod.literal('boom'),zod.literal('torch'),zod.literal('return'),zod.literal('web'),zod.literal('knife'),zod.literal(null)]).nullable(),
-  "targets": zod.array(zod.number().int())
+  "targets": zod.array(zod.union([zod.union([zod.literal(98),zod.literal(99)]),zod.enum(['self'])]))
 }).nullable(),
   "busyForMs": zod.number().int().min(actInGameRoomResponseBusyForMsMin),
   "chatMessages": zod.array(zod.object({

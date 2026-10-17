@@ -1,6 +1,7 @@
 import type { GameState, TurnResolution } from "./game-engine";
 
-export const MYSTERY_BOX_SQUARES = [14, 35, 51, 76] as const;
+export const MYSTERY_BOX_SQUARES = [14, 23, 35, 41, 51, 76] as const;
+export const KEY_ROOM_SQUARES = [17, 34, 44, 67] as const;
 export const MYSTERY_POWER_TYPES = ["bomb", "antiVenom", "defuser", "webShooter", "knife"] as const;
 export const POWER_TYPES = [...MYSTERY_POWER_TYPES, "extraDice"] as const;
 export type PowerType = (typeof POWER_TYPES)[number];
@@ -253,7 +254,7 @@ export function isValidPowerState(value: unknown): boolean {
       new Set(state.bombs.map((bomb) => bomb.square)).size !== state.bombs.length) return false;
   }
   if (state.winnerIds !== undefined) {
-    if (!Array.isArray(state.winnerIds) || state.winnerIds.length > state.players.length - 1 || new Set(state.winnerIds).size !== state.winnerIds.length || !state.winnerIds.every((id) => state.players.some((p) => p.id === id && p.position === 100 && [17,44,67].includes(p.crownKeyRoom ?? -1)))) return false;
+    if (!Array.isArray(state.winnerIds) || state.winnerIds.length > state.players.length - 1 || new Set(state.winnerIds).size !== state.winnerIds.length || !state.winnerIds.every((id) => state.players.some((p) => p.id === id && p.position === 100 && (KEY_ROOM_SQUARES as readonly number[]).includes(p.crownKeyRoom ?? -1)))) return false;
     const finished = state.winnerIds.length === state.players.length - 1;
     if (finished ? state.winnerId !== state.winnerIds[0] || state.loserId !== state.players.find((p) => !state.winnerIds.includes(p.id))?.id : !!state.winnerId || !!state.loserId || state.winnerIds.includes(state.players[state.currentPlayerIndex]?.id)) return false;
   }

@@ -3,13 +3,13 @@ name: Torch and crown quest
 description: User-defined torch-first progression and the exclusive black-room key locations.
 ---
 
-Key rooms are exclusively the black rooms 17, 44 and 67. A player's first trip to square 100 is only to collect a torch: the crown remains locked, and the player returns Home after collecting the torch. Black-room key collection comes after the torch stage and is required to obtain the crown.
+Key rooms are 17, 34, 44 and 67. A player's first trip to square 100 is only to collect a torch: the crown remains locked, and the player returns Home after collecting the torch. Black-room key collection comes after the torch stage and is required to obtain the crown.
 
 Any one of these three rooms supplies the required key. The player must then reach 100 again to unlock and claim the crown; obtaining a key alone is not a victory.
 
-**Why:** The user explicitly selected one key from any black room and a subsequent return to 100, rather than all three keys or an immediate black-room victory.
+**Why:** The user clarified on 2026-10-17 that room 34 is both a black room and a key room.
 
-**How to apply:** Track each player's quest independently. Do not treat the opponent's torch/key as shared progress. Do not qualify old ammo-room keys for the new crown condition.
+**How to apply:** Track each player's quest independently. All four rooms reveal/collect keys when reached with a torch. Do not treat the opponent's torch/key as shared progress or qualify old ammo-room keys for the crown condition.
 
 **Why:** The user replaced the ordinary first-arrival-at-100 victory with this torch-first quest.
 

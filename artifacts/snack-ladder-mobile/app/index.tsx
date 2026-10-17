@@ -49,6 +49,7 @@ import {
   type GameState,
   type MysteryPowerType,
   type ShootableSnakeSquare,
+  type ShotTarget,
   type TurnResolution,
 } from '@workspace/game-core';
 import {
@@ -409,7 +410,7 @@ export default function IndexScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [rolling, setRolling] = useState(false);
   const [diceFace, setDiceFace] = useState<number | null>(null);
-  const [selectedTargets, setSelectedTargets] = useState<ShootableSnakeSquare[]>([]);
+  const [selectedTargets, setSelectedTargets] = useState<ShotTarget[]>([]);
   const [fireStage, setFireStage] = useState<'decision' | 'targets'>('decision');
   const [bombBlast, setBombBlast] = useState<BoardBlast | null>(null);
   const [walking, setWalking] = useState<BoardMotion | null>(null);
@@ -493,7 +494,7 @@ export default function IndexScreen() {
         if (event.kind === 'shoot') {
           sounds.play('fire');
           setFiring(true);
-          setShot({ id: ++shotSequence.current, from: event.from, targets: event.targets as ShootableSnakeSquare[] });
+          setShot({ id: ++shotSequence.current, from: event.from, targets: event.targets as ShotTarget[] });
           await wait(reduceMotion ? 150 : 950);
           if (!stillCurrent()) return;
         }
@@ -887,7 +888,7 @@ export default function IndexScreen() {
     }
   }, [reduceMotion, saveLocalGame, sounds]);
 
-  const animateLocalShot = useCallback(async (before: GameState, targets: readonly ShootableSnakeSquare[]) => {
+  const animateLocalShot = useCallback(async (before: GameState, targets: readonly ShotTarget[]) => {
     const epoch = ++localAnimationEpoch.current;
     const wait = (duration: number) => new Promise<void>((resolve) => setTimeout(resolve, duration));
     const stillCurrent = () => isMounted.current && localAnimationEpoch.current === epoch;
@@ -1010,10 +1011,10 @@ export default function IndexScreen() {
     }
   }, [animateLocalResolution, currentPlayer, game, online.session, remoteAction, rolling]);
 
-  const chooseAimTargets = (choice: '98' | '99' | 'both') => {
+  const chooseAimTargets = (choice: '98' | '99' | 'both' | 'self') => {
     if (actionDisabled || !waitingForShot || !currentPlayer) return;
-    const targets: ShootableSnakeSquare[] = choice === 'both' ? [98, 99] : [choice === '98' ? 98 : 99];
-    if (targets.length > currentPlayer.bullets || targets.some((target) => currentPlayer.snakeStuns[target] > 0)) return;
+    const targets: ShotTarget[] = choice === 'both' ? [98, 99] : choice === 'self' ? ['self'] : [choice === '98' ? 98 : 99];
+    if (targets.length > currentPlayer.bullets || targets.some((target) => target !== 'self' && currentPlayer.snakeStuns[target] > 0)) return;
     setSelectedTargets((current) =>
       current.length === targets.length && current.every((target, index) => target === targets[index]) ? [] : targets,
     );
@@ -1918,7 +1919,7 @@ export default function IndexScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Fire now and choose a target"
                   onPress={() => setFireStage('targets')}
-                  disabled={actionDisabled || currentPlayer.bullets < 1 || currentPlayer.snakeStuns[98] > 0 && currentPlayer.snakeStuns[99] > 0}
+                  disabled={actionDisabled || currentPlayer.bullets < 1}
                   style={[styles.aimDecisionButton, { backgroundColor: colors.destructive, borderColor: colors.destructive, opacity: actionDisabled ? 0.55 : 1 }]}
                   testID="button-fire-start"
                 >
@@ -1944,15 +1945,18 @@ export default function IndexScreen() {
                     { choice: '98', label: '98', valid: currentPlayer.bullets > 0 && currentPlayer.snakeStuns[98] === 0 },
                     { choice: '99', label: '99', valid: currentPlayer.bullets > 0 && currentPlayer.snakeStuns[99] === 0 },
                     { choice: 'both', label: 'Both', valid: currentPlayer.bullets >= 2 && currentPlayer.snakeStuns[98] === 0 && currentPlayer.snakeStuns[99] === 0 },
+                    { choice: 'self', label: 'Self', valid: currentPlayer.bullets > 0 },
                   ] as const).map(({ choice, label, valid }) => {
                     const selected = choice === 'both'
                       ? selectedTargets.length === 2
-                      : selectedTargets.length === 1 && selectedTargets[0] === Number(choice);
+                      : choice === 'self'
+                        ? selectedTargets.length === 1 && selectedTargets[0] === 'self'
+                        : selectedTargets.length === 1 && selectedTargets[0] === Number(choice);
                     return (
                       <Pressable
                         key={choice}
                         accessibilityRole="radio"
-                        accessibilityLabel={label === 'Both' ? 'Target both snakes using two bullets' : `Target snake ${label}`}
+                        accessibilityLabel={label === 'Both' ? 'Target both snakes using two bullets' : label === 'Self' ? 'Target yourself and return Home' : `Target snake ${label}`}
                         accessibilityState={{ checked: selected, disabled: !valid || actionDisabled }}
                         onPress={() => chooseAimTargets(choice)}
                         disabled={!valid || actionDisabled}
@@ -1970,7 +1974,7 @@ export default function IndexScreen() {
                 <View style={styles.aimSubmitRow}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={selectedTargets.length === 2 ? 'Fire at both snakes' : selectedTargets.length === 1 ? `Fire at snake ${selectedTargets[0]}` : 'Choose a target before firing'}
+                    accessibilityLabel={selectedTargets[0] === 'self' ? 'Fire at yourself and return Home' : selectedTargets.length === 2 ? 'Fire at both snakes' : selectedTargets.length === 1 ? `Fire at snake ${selectedTargets[0]}` : 'Choose a target before firing'}
                     onPress={fireSelected}
                     disabled={actionDisabled || selectedTargets.length === 0 || selectedTargets.length > currentPlayer.bullets}
                     style={[styles.aimFireSubmit, { backgroundColor: colors.destructive, opacity: actionDisabled || selectedTargets.length === 0 ? 0.48 : 1 }]}
@@ -1978,7 +1982,7 @@ export default function IndexScreen() {
                   >
                     <Feather name="crosshair" size={16} color={colors.primaryForeground} />
                     <Text style={[styles.aimDecisionLabel, { color: colors.primaryForeground }]}>
-                      {selectedTargets.length === 2 ? 'Fire both' : selectedTargets.length === 1 ? `Fire ${selectedTargets[0]}` : 'Fire'}
+                      {selectedTargets[0] === 'self' ? 'Fire at self' : selectedTargets.length === 2 ? 'Fire both' : selectedTargets.length === 1 ? `Fire ${selectedTargets[0]}` : 'Fire'}
                     </Text>
                   </Pressable>
                   <Pressable

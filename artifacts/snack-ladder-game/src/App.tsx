@@ -15,7 +15,7 @@ import {
   SNAKES,
   LADDERS,
   BOOM_SQUARE,
-  LOCKED_SQUARES,
+  BLACK_ROOM_SQUARES,
   KEY_SQUARES,
   MYSTERY_BOX_SQUARES,
   choosePower,
@@ -27,6 +27,7 @@ import {
   resolveDefense,
   isValidPowerState,
   type ShootableSnakeSquare,
+  type ShotTarget,
   type GameState,
   type TurnResolution,
   type MysteryPowerType,
@@ -73,7 +74,7 @@ type WalkingPiece = {
   effect: 'step' | 'ladder' | 'snake' | 'boom' | 'torch' | 'return' | 'bamboo' | 'web' | 'knife';
   sourcePosition?: number;
 };
-type Shot = { from: number; targets: ShootableSnakeSquare[] };
+type Shot = { from: number; targets: ShotTarget[] };
 type PickupNotice = PickupCelebration & { id: number };
 
 const SNAKE_ART = new URL('./realistic-snake-red.png', import.meta.url).href;
@@ -175,7 +176,7 @@ function isSavedGame(value: unknown): value is GameState {
       (player.unlockedGates === undefined ||
         (Array.isArray(player.unlockedGates) &&
           player.unlockedGates.every((gate) =>
-            (LOCKED_SQUARES as readonly number[]).includes(gate),
+            (KEY_SQUARES as readonly number[]).includes(gate),
           ))),
     ) &&
     Number.isInteger(game.currentPlayerIndex) &&
@@ -359,7 +360,7 @@ function PowerAnimation({ walking }: { walking: WalkingPiece | null }) {
           {rays.map((path, index) => <path d={path} key={`blast-ray-${index}`} className="bomb-blast-ray" />)}
           <circle r="49" className="bomb-blast-core" />
           <circle r="25" className="bomb-blast-center" />
-          <text x="0" y="8" className="bomb-blast-label">BOOM</text>
+          <text x="0" y="8" className="bomb-blast-label">BOMB</text>
         </g>
       </svg>
     );
@@ -461,10 +462,10 @@ function Board({
    onChoosePower: (power: MysteryPowerType) => void;
   walking: WalkingPiece | null;
   aiming: boolean;
-  selectedTargets: ShootableSnakeSquare[];
+  selectedTargets: ShotTarget[];
   shot: Shot | null;
   firing: boolean;
-  onAimTarget?: (square: ShootableSnakeSquare) => void;
+  onAimTarget?: (square: ShotTarget) => void;
 }) {
   const activePlayer = game.players[game.currentPlayerIndex];
   const activeStuns = activePlayer.snakeStuns ?? { 98: 0, 99: 0 };
@@ -472,12 +473,13 @@ function Board({
     const row = Math.floor(i / 10);
     const col = i % 10;
     const number = squareAt(row, col);
-    const gate = (LOCKED_SQUARES as readonly number[]).includes(number);
+    const blackRoom = (BLACK_ROOM_SQUARES as readonly number[]).includes(number);
+    const gate = (KEY_SQUARES as readonly number[]).includes(number);
     const bullet = (BULLET_PICKUP_SQUARES as readonly number[]).includes(number);
     const mysteryBox = (MYSTERY_BOX_SQUARES as readonly number[]).includes(number);
     const gun = (GUN_SQUARES as readonly number[]).includes(number);
     const boom = number === BOOM_SQUARE;
-    const tone = gate ? 'locked' : bullet ? 'bullet-square' : number % 3 === 0 ? 'blue' : (row + col) % 2 === 0 ? 'green' : 'cream';
+    const tone = blackRoom ? 'locked' : bullet ? 'bullet-square' : number % 3 === 0 ? 'blue' : (row + col) % 2 === 0 ? 'green' : 'cream';
     const roomCarrier = game.players.find((player) =>
       (player.hasTorch || player.crownKeyRoom === number) && player.position === number
     ) ??
@@ -494,7 +496,7 @@ function Board({
           ? 'black room remains lit after the key was collected'
           : 'black room lit by a torch';
     return (
-      <div className={`board-cell ${tone} ${gate || bullet ? 'special' : ''} ${gate ? roomLit ? 'key-room-lit' : 'key-room-dark' : ''}`} key={number} data-testid={`board-square-${number}`} aria-label={`Square ${number}${gate ? `, ${roomDescription}` : ''}${bullet ? ', bullet pickup on landing' : ''}${mysteryBox ? ', mystery box' : ''}${gun ? ', gun' : ''}${boom ? ', boom trap' : ''}`}>
+      <div className={`board-cell ${tone} ${gate || bullet ? 'special' : ''} ${blackRoom ? gate && roomLit ? 'key-room-lit' : 'key-room-dark' : ''}`} key={number} data-testid={`board-square-${number}`} aria-label={`Square ${number}${blackRoom ? gate ? `, ${roomDescription}` : ', black room' : ''}${bullet ? ', bullet pickup on landing' : ''}${mysteryBox ? ', mystery box' : ''}${gun ? ', gun' : ''}${boom ? ', boom trap' : ''}`}>
         <span className="cell-number" data-testid={`square-number-${number}`}>{number}</span>
         {bullet && <BulletIcon square={number} />}
         {mysteryBox && <MysteryBoxIcon square={number} />}
@@ -630,12 +632,13 @@ function Board({
             </button>
           );
         })}
-        {shot && <ShotAnimation from={centerOf(shot.from)} targets={shot.targets.map((square) => ({ square, ...centerOf(square) }))} />}
+        {shot && <ShotAnimation from={centerOf(shot.from)} targets={shot.targets.map((target) => ({ square: target === 'self' ? shot.from : target, ...centerOf(target === 'self' ? shot.from : target) }))} />}
         <PowerAnimation walking={walking} />
         {game.pendingChoice?.kind === "mystery" && <MysteryCompass
           key={game.pendingChoice.playerId + "-" + game.pendingChoice.square}
           square={game.pendingChoice.square} canChoose={choicesEnabled} busy={choiceBusy}
           onChoose={onChoosePower} />}
+        {!!game.winnerId && <MatchCelebration players={game.players} winnerIds={game.winnerIds ?? [game.winnerId]} loserId={game.loserId ?? game.players.find((p) => p.id !== game.winnerId)!.id} />}
         {game.players.map((player, index) => {
           const isWalking = walking?.playerId === player.id || walking?.playerIds?.includes(player.id);
           const position = isWalking && walking ? walking.position : player.position;
@@ -708,7 +711,7 @@ function GameScreen() {
     pickupNoticeSequence.current += 1;
     setPickupNotice({ ...pickup, id: pickupNoticeSequence.current });
   };
-  const [selectedTargets, setSelectedTargets] = useState<ShootableSnakeSquare[]>([]);
+  const [selectedTargets, setSelectedTargets] = useState<ShotTarget[]>([]);
   const [fireStage, setFireStage] = useState<'decision' | 'targets'>('decision');
   const [shot, setShot] = useState<Shot | null>(null);
   const [firing, setFiring] = useState(false);
@@ -910,16 +913,16 @@ function GameScreen() {
     }
   };
 
-  const chooseAimTargets = (choice: '98' | '99' | 'both') => {
+  const chooseAimTargets = (choice: '98' | '99' | 'both' | 'self') => {
     if (remoteDisabled || firing || !waitingToFire) return;
-    const targets: ShootableSnakeSquare[] = choice === 'both' ? [98, 99] : [choice === '98' ? 98 : 99];
-    if (targets.some((target) => !availableTargets.includes(target)) || targets.length > currentPlayer.bullets) return;
+    const targets: ShotTarget[] = choice === 'both' ? [98, 99] : choice === 'self' ? ['self'] : [choice === '98' ? 98 : 99];
+    if (targets.some((target) => target !== 'self' && !availableTargets.includes(target)) || targets.length > currentPlayer.bullets) return;
     setSelectedTargets((current) =>
       current.length === targets.length && current.every((target, index) => target === targets[index]) ? [] : targets,
     );
   };
 
-  const fireAtTargets = async (aimedTargets: ShootableSnakeSquare[] = selectedTargets) => {
+  const fireAtTargets = async (aimedTargets: ShotTarget[] = selectedTargets) => {
     if (online.session) {
       if (online.canAct && aimedTargets.length) await online.action({ type: 'shoot', targets: [...aimedTargets] });
       return;
@@ -1196,7 +1199,6 @@ function GameScreen() {
         <div className="game-columns">
           <Board game={game} pickupNotice={pickupNotice} walking={walking} aiming={false} selectedTargets={selectedTargets} shot={shot} firing={firing} choicesEnabled={!remoteDisabled} choiceBusy={rolling || firing}
             onChoosePower={(power) => applyPower((state) => choosePower(state, power), {type: "choose", power})} />
-            {!!game.winnerId && <MatchCelebration players={game.players} winnerIds={game.winnerIds ?? [game.winnerId]} loserId={game.loserId ?? game.players.find((p) => p.id !== game.winnerId)!.id} />}
             {!!game.winnerId && <button type="button" className="primary-action" data-testid="celebration-music" disabled={sounds.muted} onClick={() => sounds.setCelebrating(true)}>Play celebration music</button>}
           <section className="side-panel" aria-label="Game controls and player status" data-testid="game-controls">
             <section className="quest-progress-line" data-testid="game-progress" aria-label={`${currentPlayer.name}'s Torch, Key and Crown progress`}>
@@ -1300,7 +1302,7 @@ function GameScreen() {
                 const victim = game.players.find((player) => player.id !== bomb.ownerId && player.position === bomb.square)
                   ?? game.players.find((player) => player.id === bomb.ownerId && player.position === bomb.square);
                 void applyAnimatedPower(
-                  (state) => ({ state: detonateBomb(state, id, state.bombs.find((item) => item.id === id)!.ownerId), path: [], effect: 'boom' }),
+                  (state) => ({ state: detonateBomb(state, id, state.bombs.find((item) => item.id === id)!.ownerId), path: [], effect: 'boom', sourcePosition: bomb.square }),
                   victim?.id,
                   { type: 'detonate', bombId: id },
                 );
@@ -1332,13 +1334,13 @@ function GameScreen() {
                         {fireStage === 'decision'
                           ? remoteDisabled ? `${currentPlayer.name} is choosing whether to fire.` : 'Fire now, or leave this shot.'
                           : selectedTargets.length
-                            ? `Selected: ${selectedTargets.map((square) => `Snake ${square}`).join(' + ')}`
+                            ? `Selected: ${selectedTargets.map((target) => target === 'self' ? 'Self · return Home' : `Snake ${target}`).join(' + ')}`
                             : fireAimPrompt}
                       </div>
                       {fireStage === 'decision' ? (
                         <div className="aim-decision-row">
-                          <button className="aim-action aim-fire-start" onClick={() => setFireStage('targets')}
-                            disabled={remoteDisabled || rolling || firing || availableTargets.length === 0 || currentPlayer.bullets < 1}
+                            <button className="aim-action aim-fire-start" onClick={() => setFireStage('targets')}
+                            disabled={remoteDisabled || rolling || firing || currentPlayer.bullets < 1}
                             data-testid="button-fire-start" aria-label="Choose a snake target">
                             <Crosshair size={17} /> Fire
                           </button>
@@ -1365,13 +1367,18 @@ function GameScreen() {
                               aria-pressed={selectedTargets.length === 2} data-testid="aim-choice-both">
                               Both
                             </button>
+                            <button type="button" className={`aim-target-choice ${selectedTargets.length === 1 && selectedTargets[0] === 'self' ? 'selected' : ''}`}
+                              onClick={() => chooseAimTargets('self')} disabled={remoteDisabled || firing || currentPlayer.bullets < 1}
+                              aria-pressed={selectedTargets.length === 1 && selectedTargets[0] === 'self'} data-testid="aim-choice-self">
+                              Self
+                            </button>
                           </div>
                           <div className="aim-submit-row">
                             <button className="aim-action aim-fire-submit" onClick={() => void fireAt()}
                               disabled={remoteDisabled || rolling || firing || selectedTargets.length === 0 || selectedTargets.length > currentPlayer.bullets}
-                              aria-label={selectedTargets.length === 2 ? 'Fire at both snakes' : selectedTargets.length === 1 ? `Fire at snake ${selectedTargets[0]}` : 'Choose a target before firing'}
+                              aria-label={selectedTargets[0] === 'self' ? 'Fire at yourself and return Home' : selectedTargets.length === 2 ? 'Fire at both snakes' : selectedTargets.length === 1 ? `Fire at snake ${selectedTargets[0]}` : 'Choose a target before firing'}
                               data-testid="button-fire">
-                              <Crosshair size={16} /> {firing ? 'Firing…' : selectedTargets.length === 2 ? 'Fire both' : 'Fire'}
+                              <Crosshair size={16} /> {firing ? 'Firing…' : selectedTargets[0] === 'self' ? 'Fire at self' : selectedTargets.length === 2 ? 'Fire both' : 'Fire'}
                             </button>
                             <button className="aim-action aim-leave" onClick={passShot}
                               disabled={remoteDisabled || rolling || firing} data-testid="button-pass-fire">
@@ -1408,13 +1415,13 @@ function GameScreen() {
               <div className="rules-list" data-testid="rules-content">
                 <div className="rule-line"><span className="rule-swatch" style={{ background: '#dc8540' }} /> Ladders lift you up; snakes send you sliding.</div>
                 <div className="rule-line"><Dices size={13} /> A valid six earns another chance. Overshooting 100 does not.</div>
-                <div className="rule-line"><Sparkles size={13} /> Rooms 14, 35, 51 and 76 let you choose a Bomb, Anti-Venom, Defuser Kit or Extra Dice.</div>
+                <div className="rule-line"><Sparkles size={13} /> Rooms 14, 23, 35, 41, 51 and 76 let you choose a power.</div>
                 <div className="rule-line"><Bomb size={13} /> Plant a bomb in your room: detonate now to send yourself Home, or wait for a rival to stop there. Inventory stays safe.</div>
                 <div className="rule-line"><TorchIcon size={13} /> First arrival at 100 gives a torch and returns you Home, not a crown.</div>
-                <div className="rule-line"><KeyRound size={13} color="#f0c65a" /> With your torch, land in black room 17, 44 or 67 for one key.</div>
+                <div className="rule-line"><KeyRound size={13} color="#f0c65a" /> With your torch, land in black room 17, 34, 44 or 67 for one key.</div>
                 <div className="rule-line"><LockKeyhole size={13} /> Reach 100 without a black-room key and return Home to try again. Torch and key progress survive blasts.</div>
                 <div className="rule-line"><CircleDot size={13} color="#dce6e9" /> Stop on {BULLET_PICKUP_SQUARES.join(', ')} to collect ammo, not while crossing; carry up to {MAX_BULLETS}.</div>
-                <div className="rule-line"><Crosshair size={13} color="#f0c65a" /> Stop in a gun room to shoot 98, 99, or both with two bullets. Hits last for your next {SNAKE_STUN_ROLLS} rolls.</div>
+                <div className="rule-line"><Crosshair size={13} color="#f0c65a" /> Stop in a gun room to shoot 98, 99, both with two bullets, or yourself to return Home. Snake protection lasts for your next {SNAKE_STUN_ROLLS} rolls.</div>
                 <div className="rule-line"><ShieldPlus size={13} /> Use one Anti-Venom before a bite to stay in that snake room. Keeping it means sliding down.</div>
                 <div className="rule-line"><Wrench size={13} /> A Defuser Kit protects one visit to boom room 97 or removes a rival's planted bomb.</div>
                 <div className="rule-line"><Dices size={13} /> Use Extra Dice before rolling to bank one additional roll. A valid six gives a separate bonus and does not spend that credit.</div>
